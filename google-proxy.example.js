@@ -1,126 +1,260 @@
-/**
- * LeadMap Pro — proxy opcional para Google Maps Platform
- * =======================================================
- * Protege as API keys: o browser fala apenas com este servidor; as keys
- * vivem em variáveis de ambiente e NUNCA chegam ao frontend.
- *
- * Uso local:
- *   npm init -y && npm i express
- *   GOOGLE_MAPS_API_KEY="A_TUA_KEY" node google-proxy.js
- *   → http://localhost:3333 (serve o index.html + /api/google/*)
- *
- * Produção: adaptar cada rota a uma serverless function (Netlify/Vercel)
- * e definir as env vars no painel do host.
- *
- * Requer Node 18+ (fetch nativo).
- */
-
 const express = require('express');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3333;
 
-// Keys por variável de ambiente — nunca hardcoded.
 const MAPS_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
 const PLACES_KEY = process.env.GOOGLE_PLACES_API_KEY || MAPS_KEY;
 
-if (!MAPS_KEY) {
-  console.warn('[aviso] GOOGLE_MAPS_API_KEY não definida — os endpoints /api/google/* vão responder 503.');
-}
-
-// Serve a app estática (index.html na mesma pasta)
-app.use(express.static(path.join(__dirname)));
-
 const requireKey = (key, res) => {
-  if (!key) { res.status(503).json({ error: 'API key não configurada no servidor.' }); return false; }
+  if (!key) {
+    res.status(503).json({
+      error: 'API key não configurada no servidor.'
+    });
+    return false;
+  }
+
   return true;
 };
 
-/** Geocoding API — alternativa ao Nominatim
- *  GET /api/google/geocode?q=R.+de+São+José+3,+Caneças */
+const googleHeaders = (key, fieldMask) => ({
+  'Content-Type': 'application/json',
+  'X-Goog-Api-Key': key,
+  'X-Goog-FieldMask': fieldMask
+});
+
+if (!MAPS_KEY) {
+  console.warn('[LeadMap] GOOGLE_MAPS_API_KEY não definida.');
+}
+
+if (!PLACES_KEY) {
+  console.warn('[LeadMap] GOOGLE_PLACES_API_KEY não definida.');
+}
+
+app.use(express.static(path.join(__dirname)));
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    service: 'LeadMap Pro Google Proxy',
+    mapsKeyConfigured: Boolean(MAPS_KEY),
+    placesKeyConfigured: Boolean(PLACES_KEY)
+  });
+});
+
 app.get('/api/google/geocode', async (req, res) => {
   if (!requireKey(MAPS_KEY, res)) return;
+
+  const query = String(req.query.q || '').trim();
+
+  if (!query) {
+    return res.status(400).json({
+      error: 'Parâmetro q é obrigatório.'
+    });
+  }
+
   try {
-    const url = 'https://maps.googleapis.com/maps/api/geocode/json?address=' +
-      encodeURIComponent(req.query.q || '') + '&region=pt&language=pt-PT&key=' + MAPS_KEY;
-    const r = await fetch(url);
-    res.json(await r.json());
-  } catch (err) {
-    res.status(502).json({ error: 'Falha a contactar a Geocoding API.' });
+    const params = new URLSearchParams({
+      address: query,
+      region: 'pt',
+      language: 'pt-PT',
+      key: MAPS_KEY
+    });
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?${params}`
+    );
+
+    const data = await response.json();
+
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error('[Geocoding]', error);
+
+    res.status(502).json({
+      error: 'Falha ao contactar a Google Geocoding API.'
+    });
   }
 });
 
-/** Places API (New) — Nearby Search
- *  GET /api/google/places/nearby?lat=38.81&lon=-9.22&radius=30000&keyword=clinica
- *  Devolve leads mais ricos que o OSM (telefone, website, horários, rating). */
 app.get('/api/google/places/nearby', async (req, res) => {
   if (!requireKey(PLACES_KEY, res)) return;
+
   try {
-    const { lat, lon, radius, keyword } = req.query;
-    const r = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': PLACES_KEY,
-        // FieldMask: pedir só o necessário controla os custos por pedido.
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.types,places.postalAddress'
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    const radius = Math.min(
+      Number(req.query.radius) || 5000,
+      50000
+    );
+
+    const type = String(req.query.type || '').trim();
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return res.status(400).json({
+        error: 'lat e lon devem ser números válidos.'
+      });
+    }
+
+    const body = {
+      languageCode: 'pt-PT',
+      maxResultCount: 20,
+      locationRestriction: {
+        circle: {
+          center: {
+            latitude: lat,
+            longitude: lon
+          },
+          radius
+        }
       },
-      body: JSON.stringify({
-        languageCode: 'pt-PT',
-        maxResultCount: 20,
-        locationRestriction: {
-          circle: {
-            center: { latitude: Number(lat), longitude: Number(lon) },
-            radius: Math.min(Number(radius) || 5000, 50000)
-          }
-        },
-        ...(keyword ? { includedTypes: undefined, rankPreference: 'DISTANCE' } : {})
-      })
+      rankPreference: 'DISTANCE'
+    };
+
+    if (type) {
+      body.includedTypes = [type];
+    }
+
+    const response = await fetch(
+      'https://places.googleapis.com/v1/places:searchNearby',
+      {
+        method: 'POST',
+        headers: googleHeaders(
+          PLACES_KEY,
+          [
+            'places.id',
+            'places.displayName',
+            'places.formattedAddress',
+            'places.location',
+            'places.nationalPhoneNumber',
+            'places.internationalPhoneNumber',
+            'places.websiteUri',
+            'places.types',
+            'places.postalAddress',
+            'places.rating',
+            'places.userRatingCount'
+          ].join(',')
+        ),
+        body: JSON.stringify(body)
+      }
+    );
+
+    const data = await response.json();
+
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error('[Places Nearby]', error);
+
+    res.status(502).json({
+      error: 'Falha ao contactar a Google Places API.'
     });
-    res.json(await r.json());
-  } catch (err) {
-    res.status(502).json({ error: 'Falha a contactar a Places API.' });
   }
 });
 
-/** Places API (New) — Text Search (palavra-chave livre, ex. "imobiliária em Odivelas")
- *  GET /api/google/places/text?q=imobiliária+Odivelas */
 app.get('/api/google/places/text', async (req, res) => {
   if (!requireKey(PLACES_KEY, res)) return;
-  try {
-    const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': PLACES_KEY,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.websiteUri,places.types'
-      },
-      body: JSON.stringify({ textQuery: String(req.query.q || ''), languageCode: 'pt-PT' })
+
+  const query = String(req.query.q || '').trim();
+
+  if (!query) {
+    return res.status(400).json({
+      error: 'Parâmetro q é obrigatório.'
     });
-    res.json(await r.json());
-  } catch (err) {
-    res.status(502).json({ error: 'Falha a contactar a Places API (Text Search).' });
+  }
+
+  try {
+    const body = {
+      textQuery: query,
+      languageCode: 'pt-PT',
+      regionCode: 'PT',
+      pageSize: 20
+    };
+
+    const response = await fetch(
+      'https://places.googleapis.com/v1/places:searchText',
+      {
+        method: 'POST',
+        headers: googleHeaders(
+          PLACES_KEY,
+          [
+            'places.id',
+            'places.displayName',
+            'places.formattedAddress',
+            'places.location',
+            'places.nationalPhoneNumber',
+            'places.internationalPhoneNumber',
+            'places.websiteUri',
+            'places.types',
+            'places.postalAddress',
+            'places.rating',
+            'places.userRatingCount'
+          ].join(',')
+        ),
+        body: JSON.stringify(body)
+      }
+    );
+
+    const data = await response.json();
+
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error('[Places Text Search]', error);
+
+    res.status(502).json({
+      error: 'Falha ao contactar a Google Places Text Search API.'
+    });
   }
 });
 
-/** Places API (New) — Place Details (contactos completos de um lead)
- *  GET /api/google/places/details?id=PLACE_ID */
 app.get('/api/google/places/details', async (req, res) => {
   if (!requireKey(PLACES_KEY, res)) return;
-  try {
-    const r = await fetch('https://places.googleapis.com/v1/places/' + encodeURIComponent(req.query.id || ''), {
-      headers: {
-        'X-Goog-Api-Key': PLACES_KEY,
-        'X-Goog-FieldMask': 'id,displayName,formattedAddress,location,nationalPhoneNumber,internationalPhoneNumber,websiteUri,types,postalAddress'
-      }
+
+  const placeId = String(req.query.id || '').trim();
+
+  if (!placeId) {
+    return res.status(400).json({
+      error: 'Parâmetro id é obrigatório.'
     });
-    res.json(await r.json());
-  } catch (err) {
-    res.status(502).json({ error: 'Falha a contactar a Places API (Details).' });
+  }
+
+  try {
+    const response = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+      {
+        headers: {
+          'X-Goog-Api-Key': PLACES_KEY,
+          'X-Goog-FieldMask': [
+            'id',
+            'displayName',
+            'formattedAddress',
+            'location',
+            'nationalPhoneNumber',
+            'internationalPhoneNumber',
+            'websiteUri',
+            'types',
+            'postalAddress',
+            'rating',
+            'userRatingCount'
+          ].join(',')
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error('[Places Details]', error);
+
+    res.status(502).json({
+      error: 'Falha ao contactar a Google Places Details API.'
+    });
   }
 });
 
 app.listen(PORT, () => {
-  console.log('LeadMap Pro + proxy Google em http://localhost:' + PORT);
+  console.log(
+    `LeadMap Pro + Google Proxy em http://localhost:${PORT}`
+  );
 });
