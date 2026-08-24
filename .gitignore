@@ -7,3 +7,10 @@ node_modules/
 .DS_Store
 *.pem
 *.key
+.impeccable/
+.vercel
+.env*
+
+# Ferramenta local de deploy (Vercel CLI) — não é dependência da aplicação
+package.json
+package-lock.json

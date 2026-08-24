@@ -641,10 +641,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <small class="ferr" id="err-quickInput" role="alert" hidden></small>
     </form>
     <div class="provider">
-      <span class="provider-label" id="providerLabel">Provedor de mapa</span>
+      <span class="provider-label" id="providerLabel">Fonte de dados</span>
       <div class="seg" role="group" aria-labelledby="providerLabel">
-        <button type="button" id="provOsm" aria-pressed="true">OpenStreetMap</button>
-        <button type="button" id="provGoogle" class="seg-locked" aria-pressed="false" title="Preparado, mas requer API key própria + proxy — instruções no README.md">Google Maps</button>
+        <button type="button" id="provOsm" aria-pressed="true" title="Empresas do OpenStreetMap via Overpass API">OpenStreetMap</button>
+        <button type="button" id="provGoogle" aria-pressed="false" title="Empresas da Google Places API (requer GOOGLE_PLACES_API_KEY configurada no servidor)">Google Places</button>
       </div>
     </div>
   </section>
@@ -863,15 +863,16 @@ const CONFIG = {
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
   ],
   /* =====================================================================
-     GOOGLE MAPS PLATFORM — PREPARADO MAS DESATIVADO
-     A API key NUNCA entra neste ficheiro. O frontend fala apenas com o
-     teu proxy (google-proxy.example.js), que lê as variáveis de ambiente
-     GOOGLE_MAPS_API_KEY / GOOGLE_PLACES_API_KEY no servidor.
-     Para ativar: README.md → secção "Ativar Google Maps Platform".
+     GOOGLE PLACES — ATIVO COMO FONTE DE DADOS DE EMPRESAS
+     A API key NUNCA entra neste ficheiro. O frontend fala apenas com os
+     endpoints do servidor (api/google/*), que leem as variáveis de
+     ambiente GOOGLE_PLACES_API_KEY / GOOGLE_MAPS_API_KEY.
+     Sem essa variável configurada, os endpoints respondem 503 e a app
+     mostra a mensagem correspondente. O mapa visual continua OSM.
      ===================================================================== */
   google: {
-    enabled: false,              // ← passo final da ativação
-    proxyBaseUrl: '/api/google'  // endpoints: /geocode, /places/nearby, /places/details
+    enabled: true,               // frontend autorizado a chamar /api/google/*
+    proxyBaseUrl: '/api/google'  // endpoints: /geocode, /places/nearby, /places/text, /places/details
   }
 };
 
@@ -1403,6 +1404,107 @@ function osmToLead(el) {
   };
 }
 
+/* ---------- 7b. Google Places — tradução dos nichos existentes ----------
+   NICHES/MAIN_NICHES não são alterados: estas tabelas apenas traduzem os
+   nichos que já existem para tipos/termos que a Google percebe. */
+const GOOGLE_NICHE_QUERY = {
+  imobiliario: { types: ['real_estate_agency'],           termo: 'imobiliária' },
+  saude:       { types: ['dental_clinic', 'dentist'],     termo: 'clínica dentária' },
+  estetica:    { types: ['beauty_salon', 'spa'],          termo: 'clínica de estética' },
+  automovel:   { types: ['car_dealer'],                   termo: 'stand automóvel' }
+};
+/* Tipo devolvido pela Google → nicho + segmento (dados do próprio Places) */
+const GOOGLE_TYPE_SEGMENT = {
+  real_estate_agency: ['imobiliario', 'Mediação Imobiliária'],
+  dental_clinic:      ['saude', 'Clínica Dentária'],
+  dentist:            ['saude', 'Medicina Dentária'],
+  doctor:             ['saude', 'Consultório Médico'],
+  beauty_salon:       ['estetica', 'Centro de Beleza'],
+  skin_care_clinic:   ['estetica', 'Clínica de Estética'],
+  spa:                ['estetica', 'Spa & Bem-Estar'],
+  massage:            ['estetica', 'Massagens & Terapias'],
+  hair_salon:         ['estetica', 'Cabeleireiro'],
+  car_dealer:         ['automovel', 'Stand / Concessionário'],
+  car_repair:         ['automovel', 'Oficina Automóvel']
+};
+
+/* Contexto geográfico para a Text Search (a Google não recebe lat/lon aqui) */
+function googleGeoContext() {
+  const m = state.centerMeta || {};
+  return DataCleaner.collapse(m.cidade || m.morada || state.center.label || '');
+}
+
+/* Pedido a um endpoint /api/google/* com erros explícitos (nunca silenciosos) */
+async function googleFetch(url) {
+  let res;
+  try {
+    res = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 20000);
+  } catch (err) {
+    throw new AppError('Não foi possível contactar o servidor do Google Places. Verifique a ligação à internet e tente novamente.', err);
+  }
+  const texto = await res.text();
+  let json = null;
+  try { json = texto ? JSON.parse(texto) : null; } catch (e) { json = null; }
+  if (res.ok) {
+    if (!json) throw new AppError('Resposta inválida do Google Places (não é JSON). Confirme que os endpoints em api/google/ estão publicados neste servidor.');
+    return json;
+  }
+  const e = json && json.error;
+  const det = (e && (typeof e === 'string' ? e : e.message)) || '';
+  const sufixo = det ? ' (' + det + ')' : '';
+  switch (res.status) {
+    case 400:
+      throw new AppError('Pedido inválido ao Google Places — parâmetros incorretos' + sufixo + '.');
+    case 401:
+    case 403:
+      throw new AppError('A Google recusou o pedido: API key inválida, sem permissões ou com a Places API por ativar no projeto. Verifique a key e as restrições no Google Cloud Console' + sufixo + '.');
+    case 404:
+      throw new AppError('Os endpoints /api/google não existem neste servidor. O Google Places precisa das funções em api/google/ (Vercel) ou do proxy Express — ver README.md.');
+    case 429:
+      throw new AppError('Limite/quota da Google Places API atingido. Aguarde um pouco ou reveja os limites e o billing no Google Cloud Console' + sufixo + '.');
+    case 503:
+      throw new AppError('O Google Places não está ativo no servidor: a variável de ambiente GOOGLE_PLACES_API_KEY não está configurada. Defina-a na plataforma de alojamento (ou no proxy local) e volte a tentar.');
+    default:
+      throw new AppError('Erro do Google Places (HTTP ' + res.status + ')' + sufixo + '.');
+  }
+}
+
+/* Place da Google (API New) → registo bruto no formato já usado pela app.
+   Sem nome ou sem coordenadas → descartado. Nada é inventado: campos
+   ausentes ficam null e o DataCleaner converte-os em "N/D". */
+function googlePlaceToLead(place, nichoPedido) {
+  const nome = place && place.displayName && place.displayName.text;
+  const loc = place && place.location;
+  if (!nome || !loc || loc.latitude == null || loc.longitude == null) return null;
+  const pa = place.postalAddress || {};
+  const fa = place.formattedAddress || '';
+  let nicho = null, segmento = null;
+  for (const t of (place.types || [])) {
+    if (GOOGLE_TYPE_SEGMENT[t]) { nicho = GOOGLE_TYPE_SEGMENT[t][0]; segmento = GOOGLE_TYPE_SEGMENT[t][1]; break; }
+  }
+  if (!nicho) nicho = nichoPedido || 'personalizado';
+  if (!segmento) segmento = nichoPedido && NICHES[nichoPedido] ? NICHES[nichoPedido].label : 'Resultado por palavra-chave';
+  const linhas = Array.isArray(pa.addressLines) ? pa.addressLines.filter(Boolean) : [];
+  let morada = linhas.join(', ') || (fa ? fa.split(',')[0] : null) || null;
+  let codigoPostal = pa.postalCode || null;
+  if (!codigoPostal && fa) { const m = fa.match(/\b\d{4}-\d{3}\b/); if (m) codigoPostal = m[0]; }
+  return {
+    id: 'google-' + place.id,
+    nome,
+    nicho, segmento,
+    morada,
+    codigoPostal,
+    localidade: pa.locality || pa.administrativeArea || null,
+    telefoneRaw: place.internationalPhoneNumber || place.nationalPhoneNumber || '',
+    website: place.websiteUri || null,
+    instagram: null,   /* redes sociais não são recolhidas nesta fonte */
+    facebook: null,
+    linkedin: null,
+    lat: loc.latitude, lon: loc.longitude,
+    fonte: 'Google Places'
+  };
+}
+
 const PlacesProviders = {
   overpass: {
     id: 'overpass',
@@ -1440,26 +1542,64 @@ const PlacesProviders = {
   },
 
   /* =====================================================================
-     GOOGLE PLACES API — implementação de referência (desativada)
-     Os pedidos passam SEMPRE pelo proxy (a key vive no servidor):
-       GET {proxyBaseUrl}/places/nearby?lat=..&lon=..&radius=..&keyword=..
-       GET {proxyBaseUrl}/places/details?place_id=..
-     Ver google-proxy.example.js + README.md → "Ativar Google Maps Platform".
+     GOOGLE PLACES API — fonte de dados de empresas (ativa)
+     Os pedidos passam SEMPRE pelos endpoints do servidor (a key vive lá):
+       GET {proxyBaseUrl}/places/nearby?lat=..&lon=..&radius=..&type=..
+       GET {proxyBaseUrl}/places/text?q=..
+     Sem palavra-chave → Nearby por tipo de cada nicho selecionado.
+     Com palavra-chave → Text Search (palavra-chave + nicho + localidade).
+     Os campos de contacto vêm já na FieldMask do endpoint, por isso
+     /places/details não é chamado (evita consumo de quota desnecessário).
      ===================================================================== */
   google: {
     id: 'google',
-    nome: 'Google Places API (requer configuração)',
-    async search({ lat, lon, radiusKm, keyword }) {
+    nome: 'Google Places API',
+    async search({ lat, lon, radiusKm, nicheKeys, keyword, onStatus }) {
       if (!CONFIG.google.enabled) {
         throw new AppError('O Google Places está preparado mas não configurado. Siga o README.md → "Ativar Google Maps Platform".');
       }
-      /* Exemplo (ativar depois de configurar o proxy):
-      const url = CONFIG.google.proxyBaseUrl + '/places/nearby?lat=' + lat + '&lon=' + lon +
-                  '&radius=' + Math.round(radiusKm * 1000) + '&keyword=' + encodeURIComponent(keyword || '');
-      const res = await fetchWithTimeout(url, {}, 20000);
-      const json = await res.json();
-      return json.results.map(googlePlaceToLead); */
-      return [];
+      const base = CONFIG.google.proxyBaseUrl;
+      const radiusM = Math.min(Math.round(radiusKm * 1000), 50000); /* teto do endpoint */
+      const niches = (nicheKeys || []).filter(k => GOOGLE_NICHE_QUERY[k]);
+      const pedidos = [];
+      if (keyword) {
+        const onde = googleGeoContext();
+        const texto = extra => encodeURIComponent([keyword, extra, onde].filter(Boolean).join(' '));
+        if (niches.length) {
+          for (const k of niches) pedidos.push({ nicho: k, url: base + '/places/text?q=' + texto(GOOGLE_NICHE_QUERY[k].termo) });
+        } else {
+          pedidos.push({ nicho: null, url: base + '/places/text?q=' + texto(null) });
+        }
+      } else {
+        const geo = 'lat=' + lat + '&lon=' + lon + '&radius=' + radiusM;
+        for (const k of niches) {
+          for (const t of GOOGLE_NICHE_QUERY[k].types) {
+            pedidos.push({ nicho: k, url: base + '/places/nearby?' + geo + '&type=' + encodeURIComponent(t) });
+          }
+        }
+        if (!pedidos.length) pedidos.push({ nicho: null, url: base + '/places/nearby?' + geo });
+      }
+
+      if (onStatus) onStatus('A pesquisar empresas no Google Places…');
+      const byId = new Map();  /* dedupe pelo place.id dentro da própria resposta Google */
+      let primeiroErro = null, sucessos = 0;
+      for (const p of pedidos) {
+        try {
+          const json = await googleFetch(p.url);
+          sucessos++;
+          for (const place of (json.places || [])) {
+            if (!place || !place.id || byId.has(place.id)) continue;
+            const lead = googlePlaceToLead(place, p.nicho);
+            if (lead) byId.set(place.id, lead);
+          }
+        } catch (err) {
+          if (!primeiroErro) primeiroErro = err;
+          console.warn('[Google Places] pedido falhou:', p.url, err.message || err);
+        }
+      }
+      if (!sucessos && primeiroErro) throw primeiroErro;  /* nenhum pedido passou → erro visível */
+      if (onStatus) onStatus('Google Places: a processar resultados…');
+      return Array.from(byId.values());
     }
   }
 };
@@ -1607,7 +1747,7 @@ async function runSearch(p) {
         nicheKeys: p.nicheKeys.filter(k => k !== 'personalizado'),
         keyword: p.keyword, onStatus: setStatus
       });
-      state.currentSource = 'osm';
+      state.currentSource = state.placesProvider === 'google' ? 'google' : 'osm';
     }
 
     /* 3. Limpeza, deduplicação, distância e ordenação */
@@ -2154,10 +2294,18 @@ function bindEvents() {
     renderTable(); renderKPIs(); renderSelectionBar();
   });
 
-  /* Provedor de mapa: Google preparado mas bloqueado sem configuração */
-  $('#provGoogle').addEventListener('click', () => {
-    toast('O Google Maps/Places está preparado na arquitetura, mas requer a sua API key + proxy. Instruções passo a passo no README.md.', 'info', 7000);
-  });
+  /* Fonte de dados de empresas: OpenStreetMap (Overpass) ou Google Places.
+     O mapa visual continua sempre OpenStreetMap. */
+  const setPlacesProvider = key => {
+    state.placesProvider = key;
+    $('#provOsm').setAttribute('aria-pressed', String(key === 'overpass'));
+    $('#provGoogle').setAttribute('aria-pressed', String(key === 'google'));
+    toast(key === 'google'
+      ? 'Fonte de dados: Google Places. A próxima pesquisa usa a Places API através do servidor.'
+      : 'Fonte de dados: OpenStreetMap (Overpass).', 'info');
+  };
+  $('#provOsm').addEventListener('click', () => setPlacesProvider('overpass'));
+  $('#provGoogle').addEventListener('click', () => setPlacesProvider('google'));
 
   /* Modal de pesquisa */
   $('#searchForm').addEventListener('submit', onSearchSubmit);
