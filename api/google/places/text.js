@@ -19,7 +19,32 @@ export default async function handler(req, res) {
     });
   }
 
+  /* locationBias opcional (lat/lon/radius) — dá contexto geográfico à Google e
+     reduz resultados fora da região. Retrocompatível: sem estes parâmetros o
+     comportamento é exatamente o anterior. A distância real continua a ser
+     validada a jusante; o bias é uma pista, não uma garantia. */
+  const lat = Number(req.query.lat);
+  const lon = Number(req.query.lon);
+  const radius = Number(req.query.radius);
+  const temBias = Number.isFinite(lat) && Number.isFinite(lon) &&
+    lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+
   try {
+    const corpo = {
+      textQuery: q,
+      languageCode: 'pt-PT',
+      regionCode: 'PT',
+      pageSize: 20
+    };
+    if (temBias) {
+      corpo.locationBias = {
+        circle: {
+          center: { latitude: lat, longitude: lon },
+          radius: Math.min(Math.max(Number.isFinite(radius) ? radius : 5000, 1), 50000)
+        }
+      };
+    }
+
     const response = await fetch(
       'https://places.googleapis.com/v1/places:searchText',
       {
@@ -41,12 +66,7 @@ export default async function handler(req, res) {
             'places.userRatingCount'
           ].join(',')
         },
-        body: JSON.stringify({
-          textQuery: q,
-          languageCode: 'pt-PT',
-          regionCode: 'PT',
-          pageSize: 20
-        })
+        body: JSON.stringify(corpo)
       }
     );
 

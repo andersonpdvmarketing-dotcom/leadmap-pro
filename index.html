@@ -1113,6 +1113,8 @@ const DataCleaner = {
     for (const f of this.MERGE_FIELDS) {
       if ((!base[f] || base[f] === ND) && extra[f] && extra[f] !== ND) base[f] = extra[f];
     }
+    /* união das fontes: a mesma empresa pode vir da Google e do OSM */
+    base.fontes = Array.from(new Set([...(base.fontes || []), ...(extra.fontes || [])]));
   },
   /* Deduplicação: telefone / website / nome semelhante + proximidade (<~500 m) ou mesmo CP */
   dedupe(list) {
@@ -1173,6 +1175,7 @@ function cleanLead(raw, center, dataPesquisa) {
     linkedin: C.nd(raw.linkedin),
     distanciaKm: Math.round(haversineKm(center.lat, center.lon, raw.lat, raw.lon) * 10) / 10,
     fonte: C.nd(raw.fonte),
+    fontes: Array.isArray(raw.fontes) ? raw.fontes.slice() : [],   /* rasto multi-fonte */
     dataPesquisa,
     socials: emptySocials(),  /* preenchido depois, em segundo plano (secção 20) */
     emails: []                /* preenchido depois, em segundo plano (secção 21) */
@@ -1721,8 +1724,273 @@ function demoSearch(p) {
 }
 </script>
 <script>
+/* =====================================================================
+   8b. SearchEngine — descoberta multi-fonte com orçamento adaptativo
+   ---------------------------------------------------------------------
+   Google Places e Overpass correm como adaptadores independentes que
+   NUNCA lançam para o fluxo principal: devolvem { ok, leads, erro }. A
+   falha de uma fonte nunca cancela a outra.
+
+   O plano de consultas é ordenado por relevância e executado por vagas;
+   depois de cada vaga mede-se o rendimento (leads novos por pedido) e a
+   expansão pára cedo quando as consultas passam a devolver sobretudo
+   duplicados. O teto de 40 é um limite, não uma meta.
+   ===================================================================== */
+const SEARCH_BUDGET = {
+  maxRequests: 40,      /* teto absoluto por pesquisa */
+  concorrencia: 4,      /* pedidos Google em paralelo */
+  overpassTimeout: 12000,  /* por endpoint */
+  overpassPrazo: 25000,    /* prazo global do OSM: passado isto, a pesquisa fecha sem ele */
+  minAntesDeAvaliar: 8,/* só avalia rendimento depois destes pedidos */
+  rendimentoMin: 0.5,  /* leads novos por pedido abaixo do qual se trava */
+  vagasFracasSeguidas: 2
+};
+
+/* Termos por nicho — extensível; usados na Text Search da Google */
+const CATEGORY_EXPANSIONS = {
+  imobiliario: ['imobiliária', 'agência imobiliária', 'mediação imobiliária', 'consultor imobiliário', 'compra e venda de imóveis', 'real estate'],
+  saude: ['clínica dentária', 'dentista', 'medicina dentária', 'implantologia', 'ortodontia', 'clínica médica'],
+  estetica: ['clínica de estética', 'medicina estética', 'centro de beleza', 'depilação a laser', 'spa', 'tratamentos corporais'],
+  automovel: ['stand automóvel', 'concessionário automóvel', 'venda de automóveis', 'automóveis usados', 'seminovos', 'comércio de veículos']
+};
+
+/* Ponto a `km` de distância e rumo `brng` (radianos) — geodésico */
+function pontoADistancia(lat, lon, km, brng) {
+  const R = 6371, d = km / R, rad = Math.PI / 180, deg = 180 / Math.PI;
+  const la1 = lat * rad, lo1 = lon * rad;
+  const la2 = Math.asin(Math.sin(la1) * Math.cos(d) + Math.cos(la1) * Math.sin(d) * Math.cos(brng));
+  const lo2 = lo1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(la1), Math.cos(d) - Math.sin(la1) * Math.sin(la2));
+  return { lat: la2 * deg, lon: ((lo2 * deg) + 540) % 360 - 180 };
+}
+
+/* Anéis concêntricos calculados: 1, 7, 13 ou 19 pontos conforme o raio */
+function aneisGeograficos(lat, lon, radiusKm) {
+  const pts = [{ lat, lon, anel: 0 }];
+  if (radiusKm <= 6) return pts;
+  const nAneis = radiusKm <= 12 ? 1 : radiusKm <= 32 ? 2 : 3;
+  for (let a = 1; a <= nAneis; a++) {
+    const r = radiusKm * (a / (nAneis + 0.4));
+    for (let i = 0; i < 6; i++) {
+      const ang = (2 * Math.PI * i) / 6 + (a % 2 ? 0 : Math.PI / 6);
+      const p = pontoADistancia(lat, lon, r, ang);
+      pts.push({ lat: p.lat, lon: p.lon, anel: a });
+    }
+  }
+  return pts;
+}
+
+/* ---------- Adaptadores (nunca lançam) ---------- */
+const SourceAdapters = {
+  /* Uma consulta Google (nearby por tipo, ou text com contexto geográfico) */
+  async google(consulta) {
+    const base = CONFIG.google.proxyBaseUrl;
+    const url = consulta.tipoConsulta === 'nearby'
+      ? base + '/places/nearby?lat=' + consulta.lat + '&lon=' + consulta.lon +
+        '&radius=' + Math.round(consulta.radiusM) + '&type=' + encodeURIComponent(consulta.googleType)
+      : base + '/places/text?q=' + encodeURIComponent(consulta.termo) +
+        '&lat=' + consulta.lat + '&lon=' + consulta.lon + '&radius=' + Math.round(consulta.radiusM);
+    try {
+      const json = await googleFetch(url);
+      const out = [];
+      for (const place of (json.places || [])) {
+        if (!place || !place.id) continue;
+        const lead = googlePlaceToLead(place, consulta.nicho);
+        if (lead) { lead.fontes = ['google']; out.push(lead); }
+      }
+      return { ok: true, leads: out };
+    } catch (err) {
+      console.warn('[SearchEngine] Google falhou:', url, err.message || err);
+      return { ok: false, leads: [], erro: err };
+    }
+  },
+
+  /* Overpass: uma consulta cobre todo o raio (sem teto de 20). Opcional. */
+  async overpass({ lat, lon, radiusKm, nicheKeys, keyword }) {
+    const query = buildOverpassQuery({ lat, lon, radiusM: Math.round(radiusKm * 1000), nicheKeys, keyword });
+    let ultimoErro = null;
+    for (const endpoint of CONFIG.overpassEndpoints) {
+      try {
+        const res = await fetchWithTimeout(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'data=' + encodeURIComponent(query)
+        }, SEARCH_BUDGET.overpassTimeout);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        const vistos = new Set(), out = [];
+        for (const el of (json.elements || [])) {
+          const k = el.type + el.id;
+          if (vistos.has(k)) continue;
+          vistos.add(k);
+          const lead = osmToLead(el);
+          if (lead) { lead.fontes = ['osm']; out.push(lead); }
+        }
+        return { ok: true, leads: out };
+      } catch (err) {
+        ultimoErro = err;
+        console.warn('[SearchEngine] Overpass indisponível:', endpoint, err.message || err);
+      }
+    }
+    /* Todos os endpoints falharam — devolve, nunca lança */
+    return { ok: false, leads: [], erro: ultimoErro };
+  }
+};
+
+/* ---------- Plano de consultas, ordenado por relevância ---------- */
+function planearConsultas({ lat, lon, radiusKm, nicheKeys, keyword }) {
+  const nichos = (nicheKeys || []).filter(k => GOOGLE_NICHE_QUERY[k]);
+  const pontos = aneisGeograficos(lat, lon, radiusKm);
+  const nAneis = Math.max(...pontos.map(p => p.anel));
+  const subRaioM = Math.max(2000, Math.round(radiusKm * 1000 / (nAneis + 1)));
+  const raioM = Math.min(Math.round(radiusKm * 1000), 50000);
+  const centro = pontos[0];
+  const plano = [];
+
+  /* 1. Categoria principal — Nearby no centro, por tipo */
+  for (const k of nichos) {
+    for (const t of GOOGLE_NICHE_QUERY[k].types) {
+      plano.push({ fonte: 'google', tipoConsulta: 'nearby', nicho: k, googleType: t, lat: centro.lat, lon: centro.lon, radiusM: raioM });
+    }
+  }
+  /* 2. Palavra-chave do utilizador — Text com contexto geográfico */
+  if (keyword) {
+    plano.push({ fonte: 'google', tipoConsulta: 'text', nicho: nichos[0] || null, termo: keyword, lat: centro.lat, lon: centro.lon, radiusM: raioM });
+  }
+  /* 3. Sinónimos mais relevantes (2 primeiros por nicho), no centro */
+  for (let i = 0; i < 2; i++) {
+    for (const k of nichos) {
+      const termo = (CATEGORY_EXPANSIONS[k] || [])[i];
+      if (termo) plano.push({ fonte: 'google', tipoConsulta: 'text', nicho: k, termo, lat: centro.lat, lon: centro.lon, radiusM: raioM });
+    }
+  }
+  /* 4. Expansão geográfica — Nearby nos pontos dos anéis */
+  for (let anel = 1; anel <= nAneis; anel++) {
+    for (const p of pontos.filter(x => x.anel === anel)) {
+      for (const k of nichos) {
+        for (const t of GOOGLE_NICHE_QUERY[k].types) {
+          plano.push({ fonte: 'google', tipoConsulta: 'nearby', nicho: k, googleType: t, lat: p.lat, lon: p.lon, radiusM: subRaioM });
+        }
+      }
+    }
+  }
+  /* 5. Termos secundários, no centro */
+  for (let i = 2; i < 6; i++) {
+    for (const k of nichos) {
+      const termo = (CATEGORY_EXPANSIONS[k] || [])[i];
+      if (termo) plano.push({ fonte: 'google', tipoConsulta: 'text', nicho: k, termo, lat: centro.lat, lon: centro.lon, radiusM: raioM });
+    }
+  }
+  return plano;
+}
+
+/* ---------- Motor ---------- */
+const SearchEngine = {
+  async run({ lat, lon, radiusKm, nicheKeys, keyword, onStatus, onBatch, contarUnicos }) {
+    const estado = {
+      pedidos: 0, teto: SEARCH_BUDGET.maxRequests,
+      fontes: { google: 'por_consultar', osm: 'por_consultar' },
+      googleLeads: 0, osmLeads: 0, erros: []
+    };
+    const acumulado = [];
+    let ultimoUnicos = 0, vagasFracas = 0;
+
+    const emitir = () => { if (onBatch) { try { onBatch(acumulado.slice(), estado); } catch (e) { console.warn('[SearchEngine] onBatch', e); } } };
+    const unicos = () => (contarUnicos ? contarUnicos(acumulado) : acumulado.length);
+
+    /* --- Overpass em paralelo com o Google: cobre todo o raio numa consulta --- */
+    const overpassPromise = (async () => {
+      estado.pedidos++;
+      if (onStatus) onStatus('A consultar OpenStreetMap…');
+      const r = await SourceAdapters.overpass({ lat, lon, radiusKm, nicheKeys: (nicheKeys || []).filter(k => k !== 'personalizado'), keyword });
+      if (r.ok) {
+        estado.fontes.osm = 'ok';
+        estado.osmLeads = r.leads.length;
+        acumulado.push(...r.leads);
+      } else {
+        estado.fontes.osm = 'indisponivel';
+        estado.erros.push({ fonte: 'osm', msg: (r.erro && r.erro.message) || 'indisponível' });
+      }
+      return r;
+    })();
+
+    /* --- Google: plano por vagas, com orçamento adaptativo --- */
+    const plano = planearConsultas({ lat, lon, radiusKm, nicheKeys, keyword });
+    let i = 0;
+    while (i < plano.length && estado.pedidos < estado.teto) {
+      const espaco = Math.min(SEARCH_BUDGET.concorrencia, estado.teto - estado.pedidos, plano.length - i);
+      const vaga = plano.slice(i, i + espaco);
+      i += espaco;
+      estado.pedidos += vaga.length;
+      if (onStatus) onStatus('A pesquisar — ' + estado.pedidos + '/' + estado.teto + ' consultas · ' + unicos() + ' empresas');
+      const resultados = await Promise.all(vaga.map(c => SourceAdapters.google(c)));
+      let algumOk = false;
+      for (const r of resultados) {
+        if (r.ok) { algumOk = true; estado.googleLeads += r.leads.length; acumulado.push(...r.leads); }
+        else if (r.erro) estado.erros.push({ fonte: 'google', msg: r.erro.userMessage || r.erro.message });
+      }
+      if (algumOk) estado.fontes.google = 'ok';
+      else if (estado.fontes.google === 'por_consultar') estado.fontes.google = 'indisponivel';
+      emitir();
+
+      /* rendimento: leads únicos novos por pedido nesta vaga */
+      const agora = unicos();
+      const novos = agora - ultimoUnicos;
+      ultimoUnicos = agora;
+      if (estado.pedidos >= SEARCH_BUDGET.minAntesDeAvaliar) {
+        if ((novos / vaga.length) < SEARCH_BUDGET.rendimentoMin) {
+          if (++vagasFracas >= SEARCH_BUDGET.vagasFracasSeguidas) break;   /* sobretudo duplicados → parar */
+        } else vagasFracas = 0;
+      }
+    }
+
+    if (onStatus) onStatus('A consolidar resultados…');
+    /* o OSM tem prazo: se demorar demasiado, a pesquisa fecha com o que já tem */
+    await Promise.race([overpassPromise, sleep(SEARCH_BUDGET.overpassPrazo)]);
+    if (estado.fontes.osm === 'por_consultar') {
+      estado.fontes.osm = 'indisponivel';
+      estado.erros.push({ fonte: 'osm', msg: 'sem resposta dentro do prazo' });
+    }
+    emitir();
+    return { rawLeads: acumulado, estado };
+  }
+};
+
 /* ---------- 9. Fluxo de pesquisa ---------- */
 function setStatus(text) { $('#searchStatus').textContent = text; }
+
+/* Registos brutos → leads limpos, dentro do raio, sem duplicados e ordenados.
+   Usado tanto nos lotes progressivos como na consolidação final. */
+function consolidar(rawLeads, center, dateStr, radiusKm) {
+  let cleaned = rawLeads.map(r => cleanLead(r, center, dateStr));
+  cleaned = cleaned.filter(l => l.distanciaKm <= radiusKm + 0.05);   /* nunca fora do raio pedido */
+  const { leads, merged } = DataCleaner.dedupe(cleaned);
+  leads.sort((a, b) => a.distanciaKm - b.distanciaKm);
+  let truncated = 0;
+  if (leads.length > CONFIG.maxResults) { truncated = leads.length - CONFIG.maxResults; leads.length = CONFIG.maxResults; }
+  return { leads, merged, truncated };
+}
+
+/* Aviso discreto quando uma fonte esteve indisponível — nunca como falha da pesquisa */
+function mostrarEstadoFontes(estado) {
+  hideBanner('fontes');
+  state.ultimoEstadoFontes = estado || null;
+  /* indicadores no seletor: aceso = fonte contribuiu para esta pesquisa */
+  const marcar = (id, st) => {
+    const el = $(id);
+    if (!el) return;
+    el.setAttribute('aria-pressed', String(st === 'ok'));
+    el.classList.toggle('seg-locked', st === 'indisponivel');
+    el.title = st === 'ok' ? 'Contribuiu para esta pesquisa'
+      : st === 'indisponivel' ? 'Indisponível na última pesquisa' : 'Por consultar';
+  };
+  if (estado) { marcar('#provGoogle', estado.fontes.google); marcar('#provOsm', estado.fontes.osm); }
+  if (!estado) return;
+  if (estado.fontes.osm === 'indisponivel' && estado.fontes.google === 'ok') {
+    showBanner('fontes', 'warn', '<strong>OpenStreetMap temporariamente indisponível.</strong> A pesquisa continuou através do Google Places — os resultados podem estar menos completos do que o habitual.');
+  } else if (estado.fontes.google === 'indisponivel' && estado.fontes.osm === 'ok') {
+    showBanner('fontes', 'warn', '<strong>Google Places indisponível nesta pesquisa.</strong> Os resultados vieram do OpenStreetMap.');
+  }
+}
 
 function setLoading(on) {
   state.loading = on;
@@ -1757,33 +2025,7 @@ async function runSearch(p) {
     MapP().setCenter(center, p.radiusKm);
     updateLocPill();
 
-    /* 2. Obter empresas (fonte real ou demo) */
-    let rawLeads;
-    if (p.demo || IS_FILE) {
-      setStatus('A carregar dados de demonstração…');
-      await sleep(reduceMotion ? 0 : 350);
-      rawLeads = demoSearch(p);
-      state.currentSource = 'demo';
-    } else {
-      rawLeads = await PlacesProviders[state.placesProvider].search({
-        lat: center.lat, lon: center.lon, radiusKm: p.radiusKm,
-        nicheKeys: p.nicheKeys.filter(k => k !== 'personalizado'),
-        keyword: p.keyword, onStatus: setStatus
-      });
-      state.currentSource = state.placesProvider === 'google' ? 'google' : 'osm';
-    }
-
-    /* 3. Limpeza, deduplicação, distância e ordenação */
-    setStatus('A limpar e normalizar os dados…');
-    let cleaned = rawLeads.map(r => cleanLead(r, center, state.searchMeta.dateStr));
-    cleaned = cleaned.filter(l => l.distanciaKm <= p.radiusKm + 0.05);
-    const { leads, merged } = DataCleaner.dedupe(cleaned);
-    leads.sort((a, b) => a.distanciaKm - b.distanciaKm);
-    let truncated = 0;
-    if (leads.length > CONFIG.maxResults) { truncated = leads.length - CONFIG.maxResults; leads.length = CONFIG.maxResults; }
-
-    /* 4. Estado + render */
-    state.leads = leads;
+    /* limpar filtros/seleção antes dos primeiros resultados (render progressivo) */
     state.selected.clear();
     state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false };
     $('#tableFilter').value = '';
@@ -1791,14 +2033,49 @@ async function runSearch(p) {
     $('#toggleSite').checked = false;
     state.sort = { key: 'distanciaKm', dir: 'asc' };
     state.hasSearched = true;
+
+    /* 2. Obter empresas (demo, ou motor multi-fonte) */
+    let rawLeads, motorEstado = null;
+    const consolidarAqui = raw => consolidar(raw, center, state.searchMeta.dateStr, p.radiusKm);
+    if (p.demo || IS_FILE) {
+      setStatus('A carregar dados de demonstração…');
+      await sleep(reduceMotion ? 0 : 350);
+      rawLeads = demoSearch(p);
+      state.currentSource = 'demo';
+    } else {
+      const r = await SearchEngine.run({
+        lat: center.lat, lon: center.lon, radiusKm: p.radiusKm,
+        nicheKeys: p.nicheKeys.filter(k => k !== 'personalizado'),
+        keyword: p.keyword,
+        onStatus: setStatus,
+        contarUnicos: raw => consolidarAqui(raw).leads.length,
+        onBatch: raw => {                       /* resultados aparecem à medida que chegam */
+          state.leads = consolidarAqui(raw).leads;
+          renderAll();
+        }
+      });
+      rawLeads = r.rawLeads;
+      motorEstado = r.estado;
+      state.currentSource = motorEstado.fontes.google === 'ok' && motorEstado.fontes.osm === 'ok'
+        ? 'google+osm' : motorEstado.fontes.google === 'ok' ? 'google' : 'osm';
+    }
+
+    /* 3. Limpeza, deduplicação, distância e ordenação (consolidação final) */
+    setStatus('A limpar e normalizar os dados…');
+    const { leads, merged, truncated } = consolidarAqui(rawLeads);
+
+    /* 4. Estado + render */
+    state.leads = leads;
     renderAll({ animate: true });
     MapP().fitRadius();
     saveHistoryEntry(p, leads.length);
     if (state.currentSource === 'demo') showDemoBanner(); else hideBanner('demo');
+    mostrarEstadoFontes(motorEstado);
 
     const secs = ((performance.now() - t0) / 1000).toLocaleString('pt-PT', { maximumFractionDigits: 1 });
     let msg = leads.length + ' leads encontrados em ' + secs + ' s';
     if (merged) msg += ' · ' + merged + ' duplicados unidos';
+    if (motorEstado) msg += ' · ' + motorEstado.pedidos + ' consultas';
     if (truncated) msg += ' · a mostrar os ' + CONFIG.maxResults + ' mais próximos';
     toast(msg, leads.length ? 'success' : 'info', 6000);
   } catch (err) {
@@ -1828,6 +2105,12 @@ function nicheBadge(l) {
 }
 function joinAddr(l) {
   return [l.morada, l.codigoPostal, l.localidade].filter(v => v !== ND).join(' · ') || ND;
+}
+/* Fonte a mostrar: quando a mesma empresa vem de várias fontes, dizê-lo */
+function fonteLabel(l) {
+  const f = Array.isArray(l.fontes) ? l.fontes : [];
+  if (f.length > 1) return 'Google Places + OpenStreetMap';
+  return l.fonte;
 }
 /* Bloco "Presença digital" do popup — website + as 5 redes (Etapas 12 e 13) */
 function digitalHtml(l) {
@@ -1866,7 +2149,7 @@ function popupHtml(l) {
   if (l.telefone !== ND) h += '<div class="pop-line mono">' + esc(l.telefone) + '</div>';
   if (l.telemovel !== ND) h += '<div class="pop-line mono">' + esc(l.telemovel) + '</div>';
   h += digitalHtml(l);
-  h += '<div class="pop-meta mono">' + fmtKm(l.distanciaKm) + ' km · ' + esc(l.fonte) + '</div>';
+  h += '<div class="pop-meta mono">' + fmtKm(l.distanciaKm) + ' km · ' + esc(fonteLabel(l)) + '</div>';
   h += '<div class="pop-actions"><a class="pop-btn" target="_blank" rel="noopener" href="' + gmapsUrl(l) + '">Abrir no Google Maps</a>';
   h += '<a class="pop-btn" target="_blank" rel="noopener" href="' + earthUrl(l) + '">Ver no Google Earth</a></div>';
   h += '</div>';
@@ -1938,7 +2221,7 @@ function renderTable(opts) {
       : '<a href="' + esc(l.website) + '" target="_blank" rel="noopener" title="' + esc(l.website) + '">' + esc(hostOf(l.website) || l.website) + '</a>') + '</td>';
     h += '<td class="td-soc">' + socCell(l) + '</td>';
     h += '<td class="td-num">' + fmtKm(l.distanciaKm) + ' km</td>';
-    h += '<td class="td-src" title="' + esc(l.fonte) + '">' + esc(l.fonte) + '</td>';
+    h += '<td class="td-src" title="' + esc(fonteLabel(l)) + '">' + esc(fonteLabel(l)) + '</td>';
     h += '<td><span class="row-act">' +
       '<a href="' + gmapsUrl(l) + '" target="_blank" rel="noopener" title="Abrir no Google Maps" aria-label="Abrir no Google Maps">' + ic('map') + '</a>' +
       '<a href="' + earthUrl(l) + '" target="_blank" rel="noopener" title="Ver no Google Earth" aria-label="Ver no Google Earth">' + ic('globe') + '</a>' +
@@ -2092,7 +2375,7 @@ function leadsToRows(list) {
     'Latitude': l.lat,
     'Longitude': l.lon,
     'Distância (km)': l.distanciaKm,
-    'Fonte': l.fonte,
+    'Fonte': fonteLabel(l),
     'Data da Pesquisa': l.dataPesquisa
   }));
 }
@@ -2355,18 +2638,18 @@ function bindEvents() {
     renderTable(); renderKPIs(); renderSelectionBar();
   });
 
-  /* Fonte de dados de empresas: OpenStreetMap (Overpass) ou Google Places.
-     O mapa visual continua sempre OpenStreetMap. */
-  const setPlacesProvider = key => {
-    state.placesProvider = key;
-    $('#provOsm').setAttribute('aria-pressed', String(key === 'overpass'));
-    $('#provGoogle').setAttribute('aria-pressed', String(key === 'google'));
-    toast(key === 'google'
-      ? 'Fonte de dados: Google Places. A próxima pesquisa usa a Places API através do servidor.'
-      : 'Fonte de dados: OpenStreetMap (Overpass).', 'info');
+  /* Fonte de dados: a pesquisa usa SEMPRE Google Places + OpenStreetMap em
+     conjunto. Estes dois indicadores mostram o estado de cada fonte na última
+     pesquisa; não são um seletor. O mapa visual continua sempre OpenStreetMap. */
+  const explicarFontes = () => {
+    const e = state.ultimoEstadoFontes;
+    if (!e) { toast('A pesquisa usa o Google Places e o OpenStreetMap em conjunto, deduplicando os resultados.', 'info', 6000); return; }
+    const rot = { ok: 'disponível', indisponivel: 'indisponível', por_consultar: 'por consultar' };
+    toast('Última pesquisa — Google Places: ' + rot[e.fontes.google] + ' · OpenStreetMap: ' + rot[e.fontes.osm] +
+          ' · ' + e.pedidos + ' consultas.', 'info', 7000);
   };
-  $('#provOsm').addEventListener('click', () => setPlacesProvider('overpass'));
-  $('#provGoogle').addEventListener('click', () => setPlacesProvider('google'));
+  $('#provOsm').addEventListener('click', explicarFontes);
+  $('#provGoogle').addEventListener('click', explicarFontes);
 
   /* Modal de pesquisa */
   $('#searchForm').addEventListener('submit', onSearchSubmit);
