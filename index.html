@@ -352,7 +352,7 @@ input[type="checkbox"] { accent-color: var(--ink); width: 15px; height: 15px; cu
 .chip:disabled { opacity: .45; cursor: default; }
 .chip-reset { border-style: dashed; }
 .table-wrap { overflow: auto; max-height: 600px; }
-table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 1340px; font-size: 13px; }
+table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 1560px; font-size: 13px; }
 .leads thead th {
   position: sticky; top: 0; z-index: 10;
   background: var(--surface); text-align: left;
@@ -400,6 +400,10 @@ table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-wid
 .soc-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); white-space: nowrap; }
 .soc-status .soc-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: socPulse 1.2s ease-in-out infinite; }
 @keyframes socPulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+/* Coluna Email (V1) */
+.td-email { max-width: 210px; }
+.td-email a { font-weight: 600; font-size: 12.5px; }
+.email-mais { font: 600 10.5px/1 var(--mono); color: var(--muted); background: var(--surface-3); border: 1px solid var(--border); border-radius: 5px; padding: 2px 5px; margin-left: 5px; }
 /* Bloco "Presença digital" no popup do lead */
 .pop-digital { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .pop-digital-t { font: 700 9.5px/1 var(--font); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
@@ -702,6 +706,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <th class="sortable" data-sort="localidade" aria-sort="none">Localidade<svg class="ic sort-arrow" aria-hidden="true"><use href="#ic-caret"/></svg></th>
             <th>Telefone</th>
             <th>Telemóvel</th>
+            <th>Email</th>
             <th>Website</th>
             <th>Redes</th>
             <th class="sortable" data-sort="distanciaKm" aria-sort="ascending">Distância<svg class="ic sort-arrow" aria-hidden="true"><use href="#ic-caret"/></svg></th>
@@ -1169,7 +1174,8 @@ function cleanLead(raw, center, dataPesquisa) {
     distanciaKm: Math.round(haversineKm(center.lat, center.lon, raw.lat, raw.lon) * 10) / 10,
     fonte: C.nd(raw.fonte),
     dataPesquisa,
-    socials: emptySocials()   /* preenchido depois, em segundo plano (secção 20) */
+    socials: emptySocials(),  /* preenchido depois, em segundo plano (secção 20) */
+    emails: []                /* preenchido depois, em segundo plano (secção 21) */
   };
 }
 
@@ -1845,6 +1851,7 @@ function digitalHtml(l) {
   h += linha('YouTube', s.youtube.url, 'Abrir canal');
   h += linha('LinkedIn', s.linkedin.url, 'Abrir perfil');
   h += '</dl>';
+  h += emailsPopupHtml(l);
   const n = SOCIAL_NETS.filter(r => s[r].found).length;
   if (estado === 'error') h += '<div class="soc-status" style="margin-top:6px">Redes sociais: não disponível</div>';
   else if (estado === 'done') h += '<div class="soc-status" style="margin-top:6px">Redes sociais: ' + (n ? n + (n === 1 ? ' encontrada' : ' encontradas') : 'nenhuma encontrada') + '</div>';
@@ -1926,6 +1933,7 @@ function renderTable(opts) {
     h += '<td>' + cellText(l.localidade) + '</td>';
     h += '<td class="td-num">' + cellText(l.telefone, 'td-num') + '</td>';
     h += '<td class="td-num">' + cellText(l.telemovel, 'td-num') + '</td>';
+    h += '<td class="td-email">' + emailCell(l) + '</td>';
     h += '<td class="td-site">' + (l.website === ND ? '<span class="nd">' + ND + '</span>'
       : '<a href="' + esc(l.website) + '" target="_blank" rel="noopener" title="' + esc(l.website) + '">' + esc(hostOf(l.website) || l.website) + '</a>') + '</td>';
     h += '<td class="td-soc">' + socCell(l) + '</td>';
@@ -2076,6 +2084,7 @@ function leadsToRows(list) {
     'Localidade': l.localidade,
     'Telefone': l.telefone,
     'Telemóvel': l.telemovel,
+    'Email': (l.emails && l.emails.length) ? l.emails.map(e => e.email).join('; ') : ND,
     'Website': l.website,
     'Instagram': l.instagram,
     'Facebook': l.facebook,
@@ -2089,7 +2098,7 @@ function leadsToRows(list) {
 }
 function buildWorkbook(list) {
   const ws = XLSX.utils.json_to_sheet(leadsToRows(list));
-  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 17 }, { wch: 17 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 17 }];
+  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 17 }, { wch: 17 }, { wch: 34 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 17 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leads');
   return wb;
@@ -2698,9 +2707,151 @@ renderAll = function (opts) {
   try { startSocialEnrichment(); } catch (e) { console.warn('[Presença digital]', e); }
 };
 
+/* =====================================================================
+   21. Emails públicos (V1) — camada independente
+   Mesmo desenho da secção 20: corre em segundo plano depois de os leads
+   estarem no ecrã, com concorrência 3 e cache por sessão. Nunca inventa
+   nem adivinha endereços — só mostra o que o endpoint leu do website.
+   Não toca em runSearch, PlacesProviders, MapProviders nem na V1 social.
+   ===================================================================== */
+const EMAIL_CONCURRENCY = 3;
+const emailEnrichmentCache = new Map();     /* leadId → { emails, erro } */
+const emailEnrichmentInFlight = new Set();
+const emailQueue = [];
+let emailActive = 0;
+
+function emailStatus(id) {
+  if (emailEnrichmentInFlight.has(id)) return 'loading';
+  const c = emailEnrichmentCache.get(id);
+  if (c) return c.erro ? 'error' : 'done';
+  return 'idle';
+}
+
+/* Leitura tolerante: leads antigos podem não ter .emails */
+function getEmails(l) {
+  return (l && Array.isArray(l.emails)) ? l.emails : [];
+}
+
+/* Célula da coluna Email: principal + "+N" quando há mais */
+function emailCell(l) {
+  const estado = emailStatus(l.id);
+  if (estado === 'loading') return '<span class="soc-status"><span class="soc-dot"></span>A procurar…</span>';
+  if (estado === 'error') return '<span class="soc-status">Não disponível</span>';
+  const lista = getEmails(l);
+  if (!lista.length) return estado === 'done' ? '<span class="soc-status">Nenhum encontrado</span>' : '<span class="nd">' + ND + '</span>';
+  const principal = lista[0].email;
+  let h = '<a href="mailto:' + esc(principal) + '" title="' + esc(principal) + '">' + esc(principal) + '</a>';
+  if (lista.length > 1) h += '<span class="email-mais" title="' + esc(lista.slice(1).map(e => e.email).join(', ')) + '">+' + (lista.length - 1) + '</span>';
+  return h;
+}
+
+/* Bloco de emails dentro de "Presença digital" no popup */
+function emailsPopupHtml(l) {
+  const estado = emailStatus(l.id);
+  const lista = getEmails(l);
+  let h = '<div class="pop-digital-t" style="margin-top:8px">Emails</div>';
+  if (estado === 'loading') return h + '<div class="soc-status"><span class="soc-dot"></span>A procurar…</div>';
+  if (estado === 'error') return h + '<div class="soc-status">Não disponível</div>';
+  if (!lista.length) return h + '<div class="soc-status">' + (estado === 'done' ? 'Nenhum encontrado' : 'Por analisar') + '</div>';
+  return h + '<dl class="pop-dl">' + lista.map(e =>
+    '<dt>&nbsp;</dt><dd><a href="mailto:' + esc(e.email) + '">' + esc(e.email) + '</a></dd>').join('') + '</dl>';
+}
+
+/* Atualiza só este lead (célula da tabela + popup aberto) */
+function updateLeadEmailUI(id) {
+  const lead = state.leads.find(l => l.id === id);
+  if (!lead) return;
+  const tr = $$('#leadsTbody tr').find(r => r.dataset.id === id);
+  if (tr) {
+    const td = tr.querySelector('.td-email');
+    if (td) td.innerHTML = emailCell(lead);
+  }
+  const P = MapProviders.osm;
+  const m = P && P.markerById && P.markerById.get(id);
+  if (m && m.getPopup && m.getPopup()) m.setPopupContent(popupHtml(lead));
+}
+
+function applyEmails(id, registo) {
+  const lead = state.leads.find(l => l.id === id);
+  if (!lead) return;
+  lead.emails = registo.emails;
+  updateLeadEmailUI(id);
+}
+
+/* Enriquecimento de email de um lead */
+async function enrichLeadEmail(lead) {
+  if (!lead || !lead.id) return null;
+  const cached = emailEnrichmentCache.get(lead.id);
+  if (cached) { applyEmails(lead.id, cached); return cached; }   /* cache por sessão */
+  if (emailEnrichmentInFlight.has(lead.id)) return null;         /* evita duplicados */
+  emailEnrichmentInFlight.add(lead.id);
+  updateLeadEmailUI(lead.id);                                    /* mostra "A procurar…" */
+  let registo;
+  try {
+    if (!lead.website || lead.website === ND) {
+      registo = { emails: [], erro: false };                     /* sem website: nada a ler */
+    } else {
+      const res = await fetchWithTimeout('/api/enrich/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead: { id: lead.id, website: lead.website } })
+      }, 12000);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json || json.success !== true) throw new Error('resposta inválida');
+      const limpo = [];
+      for (const e of (Array.isArray(json.emails) ? json.emails : [])) {
+        if (e && typeof e.email === 'string' && /^[^@\s]+@[^@\s]+\.[a-z]{2,24}$/i.test(e.email)) {
+          limpo.push({ email: e.email.toLowerCase(), source: e.source || 'website' });
+        }
+      }
+      registo = { emails: limpo.slice(0, 5), erro: false };
+    }
+  } catch (err) {
+    console.warn('[Emails] falhou para', lead.id, err.message || err);
+    registo = { emails: [], erro: true };   /* um erro não afeta os outros leads */
+  } finally {
+    emailEnrichmentInFlight.delete(lead.id);
+  }
+  emailEnrichmentCache.set(lead.id, registo);
+  applyEmails(lead.id, registo);
+  return registo;
+}
+
+function pumpEmailQueue() {
+  while (emailActive < EMAIL_CONCURRENCY && emailQueue.length) {
+    const lead = emailQueue.shift();
+    emailActive++;
+    enrichLeadEmail(lead).catch(() => {}).then(() => {
+      emailActive--;
+      pumpEmailQueue();
+    });
+  }
+}
+
+function startEmailEnrichment() {
+  if (IS_FILE) return;
+  if (state.currentSource === 'demo') return;   /* dados fictícios: não contactar domínios .example */
+  for (const l of state.leads) {
+    if (!l || !l.id) continue;
+    if (emailEnrichmentCache.has(l.id) || emailEnrichmentInFlight.has(l.id)) continue;
+    if (emailQueue.some(x => x.id === l.id)) continue;
+    emailQueue.push(l);
+  }
+  pumpEmailQueue();
+}
+
+/* Gatilho próprio, encadeado ao anterior — não altera a V1 social */
+const renderAllComSocials = renderAll;
+renderAll = function (opts) {
+  renderAllComSocials(opts);
+  try { startEmailEnrichment(); } catch (e) { console.warn('[Emails]', e); }
+};
+
 /* API de depuração/manutenção exposta no browser */
 window.LeadMapPro = { state, CONFIG, NICHES, DataCleaner, Validator, runSearch, buildWorkbook, leadsToRows, MapProviders, PlacesProviders,
-  socials: { enrichLeadSocials, startSocialEnrichment, getSocials, emptySocials, socialStatus, socialEnrichmentCache, socialEnrichmentInFlight, SOCIAL_CONCURRENCY } };
+  socials: { enrichLeadSocials, startSocialEnrichment, getSocials, emptySocials, socialStatus, socialEnrichmentCache, socialEnrichmentInFlight, SOCIAL_CONCURRENCY },
+  emails: { enrichLeadEmail, startEmailEnrichment, getEmails, emailStatus, emailEnrichmentCache, emailEnrichmentInFlight, EMAIL_CONCURRENCY } };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
