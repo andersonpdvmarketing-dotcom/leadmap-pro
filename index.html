@@ -877,11 +877,13 @@ const CONFIG = {
   placesProvider: 'overpass',    // 'overpass' | 'google'
   nominatimUrl: 'https://nominatim.openstreetmap.org/search',
   photonUrl: 'https://photon.komoot.io/api/',
-  overpassEndpoints: [           // fallback em cadeia — se um falhar, tenta o seguinte
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+  /* Fallback em cadeia, ordenado por fiabilidade medida no browser.
+     Só entram endpoints que enviam cabeçalhos CORS: sem eles o pedido nunca
+     chega a ser lido pelo browser, por muito tempo que se espere.
+     (kumi.systems e private.coffee foram removidos por não terem CORS.) */
+  overpassEndpoints: [
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    'https://overpass-api.de/api/interpreter'
   ],
   /* =====================================================================
      GOOGLE PLACES — ATIVO COMO FONTE DE DADOS DE EMPRESAS
@@ -1739,8 +1741,9 @@ function demoSearch(p) {
 const SEARCH_BUDGET = {
   maxRequests: 40,      /* teto absoluto por pesquisa */
   concorrencia: 4,      /* pedidos Google em paralelo */
-  overpassTimeout: 12000,  /* por endpoint */
-  overpassPrazo: 25000,    /* prazo global do OSM: passado isto, a pesquisa fecha sem ele */
+  overpassTimeout: 22000,  /* por endpoint (a query autoriza 45 s ao servidor) */
+  overpassPrazo: 40000,    /* prazo global do OSM: a pesquisa fecha, mas a resposta
+                              tardia ainda é integrada se for da pesquisa atual */
   minAntesDeAvaliar: 8,/* só avalia rendimento depois destes pedidos */
   rendimentoMin: 0.5,  /* leads novos por pedido abaixo do qual se trava */
   vagasFracasSeguidas: 2
@@ -1885,30 +1888,38 @@ function planearConsultas({ lat, lon, radiusKm, nicheKeys, keyword }) {
 
 /* ---------- Motor ---------- */
 const SearchEngine = {
-  async run({ lat, lon, radiusKm, nicheKeys, keyword, onStatus, onBatch, contarUnicos }) {
+  async run({ lat, lon, radiusKm, nicheKeys, keyword, onStatus, onBatch, contarUnicos, onTardio, geracao }) {
     const estado = {
       pedidos: 0, teto: SEARCH_BUDGET.maxRequests,
       fontes: { google: 'por_consultar', osm: 'por_consultar' },
       googleLeads: 0, osmLeads: 0, erros: []
     };
     const acumulado = [];
+    const inicio = Date.now();   /* o prazo do OSM conta desde aqui, não desde o fim do Google */
     let ultimoUnicos = 0, vagasFracas = 0;
 
     const emitir = () => { if (onBatch) { try { onBatch(acumulado.slice(), estado); } catch (e) { console.warn('[SearchEngine] onBatch', e); } } };
     const unicos = () => (contarUnicos ? contarUnicos(acumulado) : acumulado.length);
 
-    /* --- Overpass em paralelo com o Google: cobre todo o raio numa consulta --- */
+    /* --- Overpass em paralelo com o Google: cobre todo o raio numa consulta ---
+       O estado da fonte reflete sempre o resultado real. Se a resposta chegar
+       depois do prazo, ainda é integrada — desde que seja desta pesquisa. */
+    let jaFechou = false;
     const overpassPromise = (async () => {
       estado.pedidos++;
       if (onStatus) onStatus('A consultar OpenStreetMap…');
       const r = await SourceAdapters.overpass({ lat, lon, radiusKm, nicheKeys: (nicheKeys || []).filter(k => k !== 'personalizado'), keyword });
+      const desatualizada = jaFechou && geracao != null && geracao !== state.searchGen;
+      if (desatualizada) return r;   /* já há outra pesquisa no ecrã: ignorar em silêncio */
       if (r.ok) {
         estado.fontes.osm = 'ok';
         estado.osmLeads = r.leads.length;
         acumulado.push(...r.leads);
+        if (jaFechou) { emitir(); if (onTardio) onTardio(estado, acumulado); }   /* chegou tarde: integrar */
       } else {
         estado.fontes.osm = 'indisponivel';
         estado.erros.push({ fonte: 'osm', msg: (r.erro && r.erro.message) || 'indisponível' });
+        if (jaFechou && onTardio) onTardio(estado, acumulado);
       }
       return r;
     })();
@@ -1944,12 +1955,13 @@ const SearchEngine = {
     }
 
     if (onStatus) onStatus('A consolidar resultados…');
-    /* o OSM tem prazo: se demorar demasiado, a pesquisa fecha com o que já tem */
-    await Promise.race([overpassPromise, sleep(SEARCH_BUDGET.overpassPrazo)]);
-    if (estado.fontes.osm === 'por_consultar') {
-      estado.fontes.osm = 'indisponivel';
-      estado.erros.push({ fonte: 'osm', msg: 'sem resposta dentro do prazo' });
-    }
+    /* o OSM tem prazo: passado isto a pesquisa fecha com o que já tem, mas a
+       fonte NÃO é dada como indisponível — continua a decorrer e, se responder,
+       os resultados entram por onTardio. Só uma falha real a marca indisponível. */
+    const restante = Math.max(0, SEARCH_BUDGET.overpassPrazo - (Date.now() - inicio));
+    await Promise.race([overpassPromise, sleep(restante)]);
+    jaFechou = true;
+    if (estado.fontes.osm === 'por_consultar') estado.fontes.osm = 'atrasado';
     emitir();
     return { rawLeads: acumulado, estado };
   }
@@ -1981,7 +1993,9 @@ function mostrarEstadoFontes(estado) {
     el.setAttribute('aria-pressed', String(st === 'ok'));
     el.classList.toggle('seg-locked', st === 'indisponivel');
     el.title = st === 'ok' ? 'Contribuiu para esta pesquisa'
-      : st === 'indisponivel' ? 'Indisponível na última pesquisa' : 'Por consultar';
+      : st === 'indisponivel' ? 'Indisponível na última pesquisa'
+      : st === 'atrasado' ? 'Ainda a responder — os resultados entram assim que chegarem'
+      : 'Por consultar';
   };
   if (estado) { marcar('#provGoogle', estado.fontes.google); marcar('#provOsm', estado.fontes.osm); }
   if (!estado) return;
@@ -2002,6 +2016,8 @@ function setLoading(on) {
 async function runSearch(p) {
   if (state.loading) return;
   state.lastParams = p;
+  /* identifica esta pesquisa: respostas tardias de pesquisas antigas são ignoradas */
+  const geracao = state.searchGen = (state.searchGen || 0) + 1;
   hideBanner('searchError');
   setLoading(true);
   setStatus('A preparar a pesquisa…');
@@ -2050,8 +2066,22 @@ async function runSearch(p) {
         onStatus: setStatus,
         contarUnicos: raw => consolidarAqui(raw).leads.length,
         onBatch: raw => {                       /* resultados aparecem à medida que chegam */
+          if (geracao !== state.searchGen) return;
           state.leads = consolidarAqui(raw).leads;
           renderAll();
+        },
+        geracao,
+        /* OSM que chega depois do prazo: integrar e corrigir o estado no ecrã */
+        onTardio: (est, raw) => {
+          if (geracao !== state.searchGen) return;   /* outra pesquisa já no ecrã */
+          const antes = state.leads.length;
+          state.leads = consolidarAqui(raw).leads;
+          renderAll();
+          mostrarEstadoFontes(est);
+          const novos = state.leads.length - antes;
+          if (est.fontes.osm === 'ok') {
+            toast('OpenStreetMap respondeu depois do prazo' + (novos > 0 ? ' — mais ' + novos + ' leads integrados.' : ' — sem leads novos.'), 'success', 6000);
+          }
         }
       });
       rawLeads = r.rawLeads;
