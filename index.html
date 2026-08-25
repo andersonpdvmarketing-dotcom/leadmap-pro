@@ -392,6 +392,22 @@ table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-wid
   text-decoration: none; transition: color .15s ease, border-color .15s ease;
 }
 .soc:hover { color: var(--text); border-color: var(--border-strong); }
+/* Indicadores de presença digital (V1) — monocromáticos: a cor pertence aos nichos */
+.soc-on { color: var(--text); border-color: var(--border-strong); }
+.soc-on:hover { background: var(--surface-3); }
+.soc-off { color: var(--faint); opacity: .5; cursor: default; }
+.soc-off:hover { color: var(--faint); border-color: var(--border); }
+.soc-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); white-space: nowrap; }
+.soc-status .soc-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: socPulse 1.2s ease-in-out infinite; }
+@keyframes socPulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+/* Bloco "Presença digital" no popup do lead */
+.pop-digital { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.pop-digital-t { font: 700 9.5px/1 var(--font); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.pop-dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; align-items: baseline; }
+.pop-dl dt { font-size: 11.5px; color: var(--muted); }
+.pop-dl dd { margin: 0; font-size: 11.5px; text-align: right; }
+.pop-dl dd a { font-weight: 600; color: var(--text) !important; }
+.pop-dl dd .nao { color: var(--faint); }
 .row-act { display: inline-flex; gap: 4px; }
 .row-act a {
   display: inline-flex; align-items: center; justify-content: center;
@@ -1152,7 +1168,8 @@ function cleanLead(raw, center, dataPesquisa) {
     linkedin: C.nd(raw.linkedin),
     distanciaKm: Math.round(haversineKm(center.lat, center.lon, raw.lat, raw.lon) * 10) / 10,
     fonte: C.nd(raw.fonte),
-    dataPesquisa
+    dataPesquisa,
+    socials: emptySocials()   /* preenchido depois, em segundo plano (secção 20) */
   };
 }
 
@@ -1806,16 +1823,42 @@ function nicheBadge(l) {
 function joinAddr(l) {
   return [l.morada, l.codigoPostal, l.localidade].filter(v => v !== ND).join(' · ') || ND;
 }
+/* Bloco "Presença digital" do popup — website + as 5 redes (Etapas 12 e 13) */
+function digitalHtml(l) {
+  const s = getSocials(l);
+  const estado = socialStatus(l.id);
+  const linha = (rot, url, acao) => '<dt>' + rot + '</dt><dd>' +
+    (url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + acao + '</a>'
+         : '<span class="nao">Não encontrado</span>') + '</dd>';
+  let h = '<div class="pop-digital"><div class="pop-digital-t">Presença digital</div>';
+  h += '<dl class="pop-dl">';
+  h += '<dt>Website</dt><dd>' + (l.website !== ND
+    ? '<a href="' + esc(l.website) + '" target="_blank" rel="noopener noreferrer">Abrir website</a>'
+    : '<span class="nao">—</span>') + '</dd>';
+  if (estado === 'loading') {
+    h += '</dl><div class="soc-status" style="margin-top:6px"><span class="soc-dot"></span>Redes sociais: a analisar…</div></div>';
+    return h;
+  }
+  h += linha('Instagram', s.instagram.url, 'Abrir perfil');
+  h += linha('Facebook', s.facebook.url, 'Abrir perfil');
+  h += linha('TikTok', s.tiktok.url, 'Abrir perfil');
+  h += linha('YouTube', s.youtube.url, 'Abrir canal');
+  h += linha('LinkedIn', s.linkedin.url, 'Abrir perfil');
+  h += '</dl>';
+  const n = SOCIAL_NETS.filter(r => s[r].found).length;
+  if (estado === 'error') h += '<div class="soc-status" style="margin-top:6px">Redes sociais: não disponível</div>';
+  else if (estado === 'done') h += '<div class="soc-status" style="margin-top:6px">Redes sociais: ' + (n ? n + (n === 1 ? ' encontrada' : ' encontradas') : 'nenhuma encontrada') + '</div>';
+  return h + '</div>';
+}
+
 function popupHtml(l) {
-  const soc = [['Instagram', l.instagram], ['Facebook', l.facebook], ['LinkedIn', l.linkedin]].filter(s => s[1] !== ND);
   let h = '<div class="pop">';
   h += '<div>' + nicheBadge(l) + '</div>';
   h += '<strong class="pop-name">' + esc(l.nome) + '</strong>';
   h += '<div class="pop-line">' + esc(joinAddr(l)) + '</div>';
   if (l.telefone !== ND) h += '<div class="pop-line mono">' + esc(l.telefone) + '</div>';
   if (l.telemovel !== ND) h += '<div class="pop-line mono">' + esc(l.telemovel) + '</div>';
-  if (l.website !== ND) h += '<div class="pop-line"><a href="' + esc(l.website) + '" target="_blank" rel="noopener">' + esc(hostOf(l.website) || l.website) + '</a></div>';
-  if (soc.length) h += '<div class="pop-line">' + soc.map(s => '<a href="' + esc(s[1]) + '" target="_blank" rel="noopener">' + s[0] + '</a>').join(' · ') + '</div>';
+  h += digitalHtml(l);
   h += '<div class="pop-meta mono">' + fmtKm(l.distanciaKm) + ' km · ' + esc(l.fonte) + '</div>';
   h += '<div class="pop-actions"><a class="pop-btn" target="_blank" rel="noopener" href="' + gmapsUrl(l) + '">Abrir no Google Maps</a>';
   h += '<a class="pop-btn" target="_blank" rel="noopener" href="' + earthUrl(l) + '">Ver no Google Earth</a></div>';
@@ -1847,11 +1890,20 @@ function computeFiltered() {
   state.filtered = list;
 }
 
+/* Coluna "Redes": indicadores compactos IG/FB/TT/YT/LI + estado do enriquecimento */
 function socCell(l) {
-  const items = [['IG', l.instagram, 'Instagram'], ['FB', l.facebook, 'Facebook'], ['IN', l.linkedin, 'LinkedIn']].filter(s => s[1] !== ND);
-  if (!items.length) return '<span class="nd">' + ND + '</span>';
-  return '<span class="soc-row">' + items.map(s =>
-    '<a class="soc" href="' + esc(s[1]) + '" target="_blank" rel="noopener" title="' + s[2] + '" aria-label="' + s[2] + '">' + s[0] + '</a>').join('') + '</span>';
+  const estado = socialStatus(l.id);
+  if (estado === 'loading') return '<span class="soc-status"><span class="soc-dot"></span>A analisar…</span>';
+  if (estado === 'error') return '<span class="soc-status">Não disponível</span>';
+  const s = getSocials(l);
+  const encontradas = SOCIAL_NETS.filter(r => s[r].found).length;
+  if (!encontradas && estado === 'done') return '<span class="soc-status">Nenhuma encontrada</span>';
+  if (!encontradas) return '<span class="nd">' + ND + '</span>';
+  return '<span class="soc-row">' + SOCIAL_NETS.map(r => {
+    const m = SOCIAL_META[r];
+    if (!s[r].found) return '<span class="soc soc-off" title="' + m.nome + ': não encontrado" aria-label="' + m.nome + ': não encontrado">' + m.sigla + '</span>';
+    return '<a class="soc soc-on" href="' + esc(s[r].url) + '" target="_blank" rel="noopener noreferrer" title="' + m.nome + ' — ' + esc(s[r].url) + '" aria-label="Abrir ' + m.nome + '">' + m.sigla + '</a>';
+  }).join('') + '</span>';
 }
 function cellText(v, cls) {
   if (v === ND) return '<span class="nd">' + ND + '</span>';
@@ -1876,7 +1928,7 @@ function renderTable(opts) {
     h += '<td class="td-num">' + cellText(l.telemovel, 'td-num') + '</td>';
     h += '<td class="td-site">' + (l.website === ND ? '<span class="nd">' + ND + '</span>'
       : '<a href="' + esc(l.website) + '" target="_blank" rel="noopener" title="' + esc(l.website) + '">' + esc(hostOf(l.website) || l.website) + '</a>') + '</td>';
-    h += '<td>' + socCell(l) + '</td>';
+    h += '<td class="td-soc">' + socCell(l) + '</td>';
     h += '<td class="td-num">' + fmtKm(l.distanciaKm) + ' km</td>';
     h += '<td class="td-src" title="' + esc(l.fonte) + '">' + esc(l.fonte) + '</td>';
     h += '<td><span class="row-act">' +
@@ -2490,8 +2542,165 @@ async function init() {
   if (IS_FILE) runSearch(defaultDemoParams());
 }
 
+/* =====================================================================
+   20. Presença digital (V1) — camada independente
+   Descobre Instagram/Facebook/TikTok/YouTube/LinkedIn em segundo plano,
+   depois de os leads já estarem no ecrã. Nunca bloqueia a pesquisa nem a
+   interface, e nunca inventa URLs: só aceita o que o endpoint validou.
+   Não toca em runSearch, PlacesProviders, MapProviders nem na exportação.
+   ===================================================================== */
+const SOCIAL_NETS = ['instagram', 'facebook', 'tiktok', 'youtube', 'linkedin'];
+const SOCIAL_META = {
+  instagram: { sigla: 'IG', nome: 'Instagram' },
+  facebook:  { sigla: 'FB', nome: 'Facebook' },
+  tiktok:    { sigla: 'TT', nome: 'TikTok' },
+  youtube:   { sigla: 'YT', nome: 'YouTube' },
+  linkedin:  { sigla: 'LI', nome: 'LinkedIn' }
+};
+const SOCIAL_CONCURRENCY = 3;   /* no máximo 3 websites em análise ao mesmo tempo */
+
+function emptySocials() {
+  const o = {};
+  for (const r of SOCIAL_NETS) o[r] = { url: null, found: false, source: null };
+  return o;
+}
+
+/* Leitura tolerante: leads antigos podem não ter .socials (Etapa 15).
+   Os campos legados (instagram/facebook/linkedin do OSM ou da demo) contam. */
+function getSocials(l) {
+  const out = emptySocials();
+  if (!l) return out;
+  for (const r of SOCIAL_NETS) {
+    const v = l.socials && l.socials[r];
+    if (v && v.found && v.url) out[r] = { url: v.url, found: true, source: v.source || null };
+  }
+  for (const r of ['instagram', 'facebook', 'linkedin']) {
+    if (!out[r].found && l[r] && l[r] !== ND) out[r] = { url: l[r], found: true, source: 'fonte' };
+  }
+  return out;
+}
+
+const socialEnrichmentCache = new Map();     /* leadId → { socials, erro } */
+const socialEnrichmentInFlight = new Set();  /* leadIds a decorrer agora */
+const socialQueue = [];
+let socialActive = 0;
+
+function socialStatus(id) {
+  if (socialEnrichmentInFlight.has(id)) return 'loading';
+  const c = socialEnrichmentCache.get(id);
+  if (c) return c.erro ? 'error' : 'done';
+  return 'idle';
+}
+
+/* Atualiza só a célula deste lead na tabela (sem re-render nem nova pesquisa) */
+function updateLeadSocialUI(id) {
+  const lead = state.leads.find(l => l.id === id);
+  if (!lead) return;
+  const tr = $$('#leadsTbody tr').find(r => r.dataset.id === id);
+  if (tr) {
+    const td = tr.querySelector('.td-soc');
+    if (td) td.innerHTML = socCell(lead);
+  }
+  /* se o popup deste lead estiver aberto, refrescar o conteúdo */
+  const P = MapProviders.osm;
+  const m = P && P.markerById && P.markerById.get(id);
+  if (m && m.isPopupOpen && m.isPopupOpen()) m.setPopupContent(popupHtml(lead));
+  else if (m && m.getPopup && m.getPopup()) m.setPopupContent(popupHtml(lead));
+}
+
+/* Aplica o resultado ao lead: preenche .socials e sincroniza os campos antigos */
+function applySocials(id, registo) {
+  const lead = state.leads.find(l => l.id === id);
+  if (!lead) return;
+  lead.socials = registo.socials;
+  for (const r of ['instagram', 'facebook', 'linkedin']) {
+    const v = registo.socials[r];
+    if (v && v.found && v.url && lead[r] === ND) lead[r] = v.url;  /* compatibilidade (Etapa 7) */
+  }
+  updateLeadSocialUI(id);
+  renderKPIs();
+}
+
+/* Enriquecimento de um lead (Etapa 8) */
+async function enrichLeadSocials(lead) {
+  if (!lead || !lead.id) return null;
+  const cached = socialEnrichmentCache.get(lead.id);
+  if (cached) { applySocials(lead.id, cached); return cached; }   /* cache (Etapa 14) */
+  if (socialEnrichmentInFlight.has(lead.id)) return null;         /* evita duplicados */
+  socialEnrichmentInFlight.add(lead.id);
+  updateLeadSocialUI(lead.id);                                    /* mostra "A analisar…" */
+  let registo;
+  try {
+    if (!lead.website || lead.website === ND) {
+      registo = { socials: emptySocials(), erro: false };          /* sem website: nada a ler */
+    } else {
+      const res = await fetchWithTimeout('/api/enrich/socials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead: {
+          id: lead.id, nome: lead.nome, website: lead.website,
+          morada: lead.morada, localidade: lead.localidade
+        } })
+      }, 12000);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json || json.success !== true || !json.socials) throw new Error('resposta inválida');
+      const limpo = emptySocials();
+      for (const r of SOCIAL_NETS) {
+        const v = json.socials[r];
+        if (v && v.found === true && typeof v.url === 'string' && /^https:\/\//.test(v.url)) {
+          limpo[r] = { url: v.url, found: true, source: v.source || 'website' };
+        }
+      }
+      registo = { socials: limpo, erro: false };
+    }
+  } catch (err) {
+    console.warn('[Presença digital] falhou para', lead.id, err.message || err);
+    registo = { socials: emptySocials(), erro: true };   /* um erro não afeta os outros leads */
+  } finally {
+    socialEnrichmentInFlight.delete(lead.id);
+  }
+  socialEnrichmentCache.set(lead.id, registo);
+  applySocials(lead.id, registo);
+  return registo;
+}
+
+/* Fila com concorrência controlada (Etapa 9) */
+function pumpSocialQueue() {
+  while (socialActive < SOCIAL_CONCURRENCY && socialQueue.length) {
+    const lead = socialQueue.shift();
+    socialActive++;
+    enrichLeadSocials(lead).catch(() => {}).then(() => {
+      socialActive--;
+      pumpSocialQueue();
+    });
+  }
+}
+
+/* Arranca o enriquecimento dos leads no ecrã; idempotente e não bloqueante */
+function startSocialEnrichment() {
+  if (IS_FILE) return;                              /* file:// não faz pedidos */
+  if (state.currentSource === 'demo') return;       /* dados fictícios: não contactar domínios .example */
+  for (const l of state.leads) {
+    if (!l || !l.id) continue;
+    if (socialEnrichmentCache.has(l.id) || socialEnrichmentInFlight.has(l.id)) continue;
+    if (socialQueue.some(x => x.id === l.id)) continue;
+    socialQueue.push(l);
+  }
+  pumpSocialQueue();
+}
+
+/* Gatilho: depois de os leads serem apresentados. Envolve renderAll em vez
+   de alterar runSearch — a camada continua independente. */
+const renderAllBase = renderAll;
+renderAll = function (opts) {
+  renderAllBase(opts);
+  try { startSocialEnrichment(); } catch (e) { console.warn('[Presença digital]', e); }
+};
+
 /* API de depuração/manutenção exposta no browser */
-window.LeadMapPro = { state, CONFIG, NICHES, DataCleaner, Validator, runSearch, buildWorkbook, leadsToRows, MapProviders, PlacesProviders };
+window.LeadMapPro = { state, CONFIG, NICHES, DataCleaner, Validator, runSearch, buildWorkbook, leadsToRows, MapProviders, PlacesProviders,
+  socials: { enrichLeadSocials, startSocialEnrichment, getSocials, emptySocials, socialStatus, socialEnrichmentCache, socialEnrichmentInFlight, SOCIAL_CONCURRENCY } };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
