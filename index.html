@@ -2514,6 +2514,11 @@ async function runSearch(p) {
   } finally {
     setLoading(false);
     $('#btnCancelar').hidden = true;
+    /* O renderAll final corre com state.loading ainda a true, por isso os
+       gatilhos de enriquecimento são ignorados nessa altura. Arrancam aqui,
+       já com loading a false. São idempotentes (cache + in-flight + fila),
+       pelo que esta chamada não duplica pedidos. */
+    try { startSocialEnrichment(); startEmailEnrichment(); } catch (e) { console.warn('[Enriquecimento]', e); }
   }
 }
 
