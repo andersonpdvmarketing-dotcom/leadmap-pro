@@ -234,6 +234,7 @@ a:hover { color: var(--ink-hover); }
 .loc-pill .loc-label { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .loc-pill .loc-radius { font: 500 12px/1 var(--mono); color: var(--muted); padding-left: 9px; border-left: 1px solid var(--border-strong); }
 .loc-pill .loc-edit { font-size: 12px; color: var(--faint); }
+.loc-pill-atenuado .loc-label { opacity: .55; }   /* modo Portugal: o ponto deixa de comandar */
 .quick { flex: 1 1 300px; min-width: 240px; }
 .quick-row { display: flex; gap: 8px; }
 .quick-field { position: relative; flex: 1; min-width: 0; }
@@ -336,6 +337,17 @@ input[type="checkbox"] { accent-color: var(--ink); width: 15px; height: 15px; cu
 .tfilter { position: relative; }
 .tfilter .ic { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; width: 14px; height: 14px; }
 .tfilter input { height: 32px; width: 210px; padding-left: 30px; font-size: 12.5px; border-radius: 7px; }
+.tsel {
+  height: 32px; max-width: 170px; padding: 0 26px 0 10px; border-radius: 7px;
+  font: 500 12.5px/1 var(--font); color: var(--text);
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235d6675' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M6 9.5 12 15l6-5.5'/%3E%3C/svg%3E") no-repeat right 8px center / 12px;
+  border: 1px solid var(--border-strong); appearance: none; cursor: pointer;
+  transition: border-color .15s ease;
+}
+.tsel:hover { border-color: var(--faint); }
+.tsel:focus-visible { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 14%, transparent); }
+.tsel:disabled { opacity: .5; cursor: not-allowed; }
+#btnCancelar { margin-top: 2px; }
 .tcheck { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--text-2); cursor: pointer; user-select: none; padding: 4px 6px; border-radius: 6px; }
 .tcheck:hover { background: var(--surface-2); }
 .chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
@@ -644,6 +656,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
   <!-- Território + pesquisa rápida + provedor -->
   <section class="toolbar" aria-label="Território e pesquisa rápida">
+    <div class="provider">
+      <span class="provider-label" id="modoLabel">Modo</span>
+      <div class="seg" role="group" aria-labelledby="modoLabel">
+        <button type="button" id="modoLocal" aria-pressed="true" title="Pesquisa por raio a partir de um ponto">Local</button>
+        <button type="button" id="modoPortugal" aria-pressed="false" title="Cobertura territorial de Portugal continental por zonas">Portugal</button>
+      </div>
+    </div>
     <button class="loc-pill" id="locPill" type="button" title="Alterar localização e raio">
       <svg class="ic"><use href="#ic-pin"/></svg>
       <span class="loc-label" id="locLabel">Caneças</span>
@@ -676,6 +695,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <div class="map-overlay" id="mapOverlay">
       <div class="spinner" aria-hidden="true"></div>
       <div id="searchStatus" role="status" aria-live="polite">A pesquisar…</div>
+      <button class="btn btn-sm" id="btnCancelar" type="button" hidden>Cancelar pesquisa</button>
     </div>
   </section>
 
@@ -685,6 +705,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <span class="results-title">Resultados</span>
       <span class="results-count mono" id="resultsCount">0</span>
       <div class="results-spacer"></div>
+      <select class="tsel" id="filtroDistrito" aria-label="Filtrar por distrito"><option value="">Todos os distritos</option></select>
+      <select class="tsel" id="filtroConcelho" aria-label="Filtrar por concelho"><option value="">Todos os concelhos</option></select>
       <label class="tcheck" for="togglePhone"><input type="checkbox" id="togglePhone"> Apenas com telefone</label>
       <label class="tcheck" for="toggleSite"><input type="checkbox" id="toggleSite"> Apenas com website</label>
       <div class="tfilter">
@@ -872,7 +894,8 @@ const CONFIG = {
   defaultCenter: { lat: 38.8151413, lon: -9.2206841, label: 'R. de São José 3, Caneças' },
   defaultMeta: { morada: 'R. de São José 3', cp: '1685-031', cidade: 'Caneças' },
   defaultRadiusKm: 30,
-  maxResults: 500,               // limite de resultados apresentados (os mais próximos)
+  maxResults: 500,               // MODO LOCAL: os 500 mais próximos do centro
+  maxResultsNacional: 20000,     // MODO PORTUGAL: mantém tudo (teto só de segurança)
   mapProvider: 'osm',            // 'osm' | 'google'  ← trocar aqui quando o Google estiver configurado
   placesProvider: 'overpass',    // 'overpass' | 'google'
   nominatimUrl: 'https://nominatim.openstreetmap.org/search',
@@ -923,7 +946,9 @@ const state = {
   leads: [],
   filtered: [],
   selected: new Set(),
-  filters: { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false },
+  filters: { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '' },
+  modo: 'local',            /* 'local' | 'portugal' */
+  cancelarPesquisa: false,
   sort: { key: 'distanciaKm', dir: 'asc' },
   searchMeta: { nicheKeys: [], keyword: '', dateStr: '' },
   currentSource: null,   // 'osm' | 'demo' | null
@@ -1103,7 +1128,7 @@ const DataCleaner = {
     if (Math.abs(a.length - b.length) / max > 0.5) return 0;
     return 1 - levenshtein(a, b) / max;
   },
-  MERGE_FIELDS: ['nome', 'segmento', 'morada', 'codigoPostal', 'localidade', 'telefone', 'telemovel', 'website', 'instagram', 'facebook', 'linkedin', 'fonte'],
+  MERGE_FIELDS: ['nome', 'segmento', 'morada', 'codigoPostal', 'localidade', 'distrito', 'concelho', 'telefone', 'telemovel', 'website', 'instagram', 'facebook', 'linkedin', 'fonte'],
   filledScore(l) { return this.MERGE_FIELDS.reduce((n, f) => n + (l[f] && l[f] !== ND ? 1 : 0), 0); },
   mergeLead(base, extra) {
     /* o registo mais completo fica como base; o outro preenche lacunas */
@@ -1169,6 +1194,8 @@ function cleanLead(raw, center, dataPesquisa) {
     morada: C.nd(C.cleanAddress(raw.morada, raw.localidade)),
     codigoPostal: C.nd(C.cleanPostcode(raw.codigoPostal)),
     localidade: C.nd(C.collapse(raw.localidade)),
+    distrito: C.nd(C.collapse(raw.distrito)),
+    concelho: C.nd(C.collapse(raw.concelho)),
     telefone: C.nd(phones.fixo || phones.invalido),
     telemovel: C.nd(phones.movel),
     website: C.nd(C.cleanWebsite(raw.website)),
@@ -1256,7 +1283,7 @@ const MapProviders = {
     map: null, markersLayer: null, circle: null, centerMarker: null, markerById: new Map(),
     init() {
       if (!window.L) return false;
-      this.map = L.map('map', { zoomControl: true }).setView([state.center.lat, state.center.lon], 11);
+      this.map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([state.center.lat, state.center.lon], 11);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
@@ -1319,8 +1346,29 @@ const MapProviders = {
     },
     renderLeads(leads) {
       if (!this.map) return;
+      if (this._pendente) { cancelAnimationFrame(this._pendente); this._pendente = null; }
       this.markersLayer.clearLayers();
       this.markerById.clear();
+      /* muitos marcadores: adicionar por lotes para não travar o browser */
+      if (leads.length > 400) {
+        const criar = l => {
+          const m = L.circleMarker([l.lat, l.lon], {
+            radius: 6, weight: 1.5, color: '#ffffff',
+            fillColor: (NICHES[l.nicho] || NICHES.personalizado).color, fillOpacity: 0.9
+          });
+          m.bindPopup(popupHtml(l), { maxWidth: 320 });
+          this.markersLayer.addLayer(m);
+          this.markerById.set(l.id, m);
+        };
+        let i = 0;
+        const lote = () => {
+          const fim = Math.min(i + 300, leads.length);
+          for (; i < fim; i++) criar(leads[i]);
+          this._pendente = i < leads.length ? requestAnimationFrame(lote) : null;
+        };
+        lote();
+        return;
+      }
       for (const l of leads) {
         const m = L.circleMarker([l.lat, l.lon], {
           radius: 7, weight: 2, color: '#ffffff',
@@ -1371,8 +1419,11 @@ const MapP = () => MapProviders[state.mapProvider];
 /* ---------- 7. Fornecedores de DADOS (empresas) ---------- */
 
 /* Consulta Overpass QL construída a partir de nichos + palavra-chave */
-function buildOverpassQuery({ lat, lon, radiusM, nicheKeys, keyword }) {
-  const around = '(around:' + radiusM + ',' + lat.toFixed(7) + ',' + lon.toFixed(7) + ')';
+function buildOverpassQuery({ lat, lon, radiusM, nicheKeys, keyword, bbox }) {
+  /* `bbox` cobre uma caixa (modo Portugal); senão, um círculo (modo Local) */
+  const around = bbox
+    ? '(' + bbox.sul + ',' + bbox.oeste + ',' + bbox.norte + ',' + bbox.este + ')'
+    : '(around:' + radiusM + ',' + lat.toFixed(7) + ',' + lon.toFixed(7) + ')';
   const parts = [];
   for (const k of nicheKeys) {
     for (const sel of (NICHES[k] ? NICHES[k].overpass : [])) parts.push('nwr' + sel + around + ';');
@@ -1382,7 +1433,8 @@ function buildOverpassQuery({ lat, lon, radiusM, nicheKeys, keyword }) {
     const words = keyword.replace(/["\\~^$|()[\]{}?*+.]/g, ' ').trim().split(/\s+/).filter(Boolean);
     if (words.length) parts.push('nwr["name"~"' + words.join('.*') + '",i]' + around + ';');
   }
-  return '[out:json][timeout:45];(\n' + parts.join('\n') + '\n);out center 1500;';
+  const teto = bbox ? 5000 : 1500;
+  return '[out:json][timeout:' + (bbox ? 120 : 45) + '];(\n' + parts.join('\n') + '\n);out center ' + teto + ';';
 }
 
 /* Deduz nicho + segmento a partir das tags OSM */
@@ -1422,6 +1474,9 @@ function osmToLead(el) {
     morada,
     codigoPostal: t['addr:postcode'] || null,
     localidade: t['addr:city'] || t['addr:suburb'] || t['addr:town'] || t['addr:village'] || null,
+    /* só tags administrativas reais; addr:city é localidade, não concelho */
+    distrito: t['addr:district'] || t['addr:province'] || null,
+    concelho: t['addr:municipality'] || null,
     telefoneRaw,
     website: t.website || t['contact:website'] || t.url || null,
     instagram: socialUrl('instagram', t['contact:instagram']),
@@ -1523,6 +1578,11 @@ function googlePlaceToLead(place, nichoPedido) {
     morada,
     codigoPostal,
     localidade: pa.locality || pa.administrativeArea || null,
+    /* A Google não devolve administrativeArea em Portugal, e `locality` é a
+       localidade (ex.: Caneças), não o concelho (Odivelas) — rotulá-la como
+       concelho seria falso. Fica N/D até haver fonte fiável. */
+    distrito: pa.administrativeArea || null,
+    concelho: null,
     telefoneRaw: place.internationalPhoneNumber || place.nationalPhoneNumber || '',
     website: place.websiteUri || null,
     instagram: null,   /* redes sociais não são recolhidas nesta fonte */
@@ -1741,6 +1801,11 @@ function demoSearch(p) {
 const SEARCH_BUDGET = {
   maxRequests: 40,      /* teto absoluto por pesquisa */
   concorrencia: 4,      /* pedidos Google em paralelo */
+  /* Modo Portugal: teto próprio, mais alto — a cobertura nacional exige
+     muitas zonas. A grelha adapta-se ao teto em vez de o ultrapassar. */
+  maxRequestsNacional: 150,
+  concorrenciaNacional: 3,
+  espacamentoNacionalKm: 35,
   overpassTimeout: 22000,  /* por endpoint (a query autoriza 45 s ao servidor) */
   overpassPrazo: 40000,    /* prazo global do OSM: a pesquisa fecha, mas a resposta
                               tardia ainda é integrada se for da pesquisa atual */
@@ -1782,6 +1847,177 @@ function aneisGeograficos(lat, lon, radiusKm) {
   return pts;
 }
 
+/* =====================================================================
+   8c. Grelha territorial de Portugal continental
+   ---------------------------------------------------------------------
+   Só geografia: pontos de pesquisa, nunca empresas. Os pontos são
+   calculados (rede hexagonal) e filtrados por um contorno simplificado do
+   território, para não gastar consultas no mar nem em Espanha.
+   Cada ponto é etiquetado com o distrito cuja capital lhe fica mais
+   próxima — é a etiqueta da ZONA de pesquisa, não a morada de um lead.
+   ===================================================================== */
+const PT_BBOX = { sul: 36.9, oeste: -9.6, norte: 42.2, este: -6.1 };
+
+/* Capitais de distrito de Portugal continental (coordenadas públicas) */
+const PT_DISTRITOS = [
+  { nome: 'Viana do Castelo', lat: 41.694, lon: -8.834, regiao: 'Norte' },
+  { nome: 'Braga',            lat: 41.545, lon: -8.427, regiao: 'Norte' },
+  { nome: 'Porto',            lat: 41.150, lon: -8.611, regiao: 'Norte' },
+  { nome: 'Vila Real',        lat: 41.301, lon: -7.744, regiao: 'Norte' },
+  { nome: 'Bragança',         lat: 41.806, lon: -6.757, regiao: 'Norte' },
+  { nome: 'Aveiro',           lat: 40.641, lon: -8.653, regiao: 'Centro' },
+  { nome: 'Viseu',            lat: 40.661, lon: -7.910, regiao: 'Centro' },
+  { nome: 'Guarda',           lat: 40.537, lon: -7.268, regiao: 'Centro' },
+  { nome: 'Coimbra',          lat: 40.211, lon: -8.429, regiao: 'Centro' },
+  { nome: 'Castelo Branco',   lat: 39.822, lon: -7.492, regiao: 'Centro' },
+  { nome: 'Leiria',           lat: 39.744, lon: -8.807, regiao: 'Centro' },
+  { nome: 'Santarém',         lat: 39.236, lon: -8.687, regiao: 'Centro' },
+  { nome: 'Portalegre',       lat: 39.291, lon: -7.428, regiao: 'Alentejo' },
+  { nome: 'Lisboa',           lat: 38.722, lon: -9.139, regiao: 'Lisboa' },
+  { nome: 'Setúbal',          lat: 38.525, lon: -8.894, regiao: 'Lisboa' },
+  { nome: 'Évora',            lat: 38.571, lon: -7.913, regiao: 'Alentejo' },
+  { nome: 'Beja',             lat: 38.015, lon: -7.863, regiao: 'Alentejo' },
+  { nome: 'Faro',             lat: 37.019, lon: -7.930, regiao: 'Algarve' }
+];
+
+/* Contorno simplificado do continente (costa + fronteira), sentido horário */
+const PT_CONTORNO = [
+  [41.87, -8.87], [41.80, -8.13], [41.98, -6.55], [41.55, -6.19], [41.03, -6.81],
+  [40.35, -6.86], [39.68, -7.02], [39.20, -7.15], [38.20, -7.00], [37.95, -7.45],
+  [37.40, -7.44], [37.00, -7.90], [37.02, -8.98], [38.05, -8.90], [38.42, -9.22],
+  [38.70, -9.50], [39.36, -9.38], [40.15, -8.88], [41.15, -8.68]
+];
+
+function dentroDePortugal(lat, lon) {
+  let dentro = false;
+  for (let i = 0, j = PT_CONTORNO.length - 1; i < PT_CONTORNO.length; j = i++) {
+    const [yi, xi] = PT_CONTORNO[i], [yj, xj] = PT_CONTORNO[j];
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+}
+
+function distritoMaisProximo(lat, lon) {
+  let melhor = PT_DISTRITOS[0], d0 = Infinity;
+  for (const d of PT_DISTRITOS) {
+    const dist = haversineKm(lat, lon, d.lat, d.lon);
+    if (dist < d0) { d0 = dist; melhor = d; }
+  }
+  return melhor;
+}
+
+/* Rede hexagonal sobre o continente. espacamentoKm define a densidade;
+   raioKm é o raio que cada zona vai pesquisar (usado para cobertura). */
+function searchGridPortugal(espacamentoKm) {
+  const passo = espacamentoKm || 35;
+  const grausLat = passo / 111.32;
+  const pontos = [];
+  let linha = 0;
+  for (let lat = PT_BBOX.sul; lat <= PT_BBOX.norte; lat += grausLat * 0.866, linha++) {
+    const grausLon = passo / (111.32 * Math.cos(lat * Math.PI / 180));
+    const desvio = (linha % 2) ? grausLon / 2 : 0;   /* encaixe hexagonal */
+    for (let lon = PT_BBOX.oeste + desvio; lon <= PT_BBOX.este; lon += grausLon) {
+      if (!dentroDePortugal(lat, lon)) continue;
+      const d = distritoMaisProximo(lat, lon);
+      pontos.push({
+        id: 'z' + pontos.length,
+        lat: +lat.toFixed(5), lon: +lon.toFixed(5),
+        district: d.nome, region: d.regiao
+      });
+    }
+  }
+  return pontos;
+}
+
+/* =====================================================================
+   8d. Classificação administrativa por coordenadas
+   ---------------------------------------------------------------------
+   Ponto-em-polígono sobre os limites oficiais dos 308 concelhos e 18
+   distritos (data/portugal-admin.json, derivado das relações
+   boundary=administrative do OpenStreetMap, que em Portugal seguem a
+   CAOP/DGT). O ficheiro é carregado UMA vez e reutilizado; nunca há um
+   pedido externo por lead. Sem correspondência → null, nunca inferido.
+   ===================================================================== */
+const ADMIN_URL = 'data/portugal-admin.json';
+let adminDados = null, adminPromessa = null, adminIndice = null;
+const adminCache = new Map();   /* "lat,lon" arredondado → resultado */
+
+async function carregarLimitesAdmin() {
+  if (adminDados) return adminDados;
+  if (adminPromessa) return adminPromessa;
+  adminPromessa = (async () => {
+    try {
+      const res = await fetchWithTimeout(ADMIN_URL, {}, 20000);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      adminDados = await res.json();
+      /* índice por célula de 0,25° para não testar os 308 concelhos por ponto */
+      adminIndice = new Map();
+      adminDados.concelhos.forEach((c, i) => {
+        const [x0, y0, x1, y1] = c.caixa;
+        for (let x = Math.floor(x0 * 4); x <= Math.floor(x1 * 4); x++) {
+          for (let y = Math.floor(y0 * 4); y <= Math.floor(y1 * 4); y++) {
+            const k = x + ':' + y;
+            if (!adminIndice.has(k)) adminIndice.set(k, []);
+            adminIndice.get(k).push(i);
+          }
+        }
+      });
+      return adminDados;
+    } catch (err) {
+      console.warn('[Admin] limites administrativos indisponíveis:', err.message || err);
+      adminDados = null;
+      return null;
+    } finally { adminPromessa = null; }
+  })();
+  return adminPromessa;
+}
+
+function pontoEmAnel(lon, lat, anel) {
+  let dentro = false;
+  for (let i = 0, j = anel.length - 1; i < anel.length; j = i++) {
+    const xi = anel[i][0], yi = anel[i][1], xj = anel[j][0], yj = anel[j][1];
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+}
+
+/* Classifica um ponto. Requer carregarLimitesAdmin() antes. */
+function resolvePortugalAdministrativeArea(lat, lon) {
+  const vazio = { district: null, municipality: null };
+  if (!adminDados || !adminIndice || lat == null || lon == null) return vazio;
+  const chave = lat.toFixed(3) + ',' + lon.toFixed(3);
+  const emCache = adminCache.get(chave);
+  if (emCache) return emCache;
+  const candidatos = adminIndice.get(Math.floor(lon * 4) + ':' + Math.floor(lat * 4)) || [];
+  let r = vazio;
+  for (const i of candidatos) {
+    const c = adminDados.concelhos[i];
+    const [x0, y0, x1, y1] = c.caixa;
+    if (lon < x0 || lon > x1 || lat < y0 || lat > y1) continue;
+    for (const anel of c.aneis) {
+      if (pontoEmAnel(lon, lat, anel)) {
+        r = { district: c.distrito || null, municipality: c.nome, source: 'administrative-boundary' };
+        break;
+      }
+    }
+    if (r.municipality) break;
+  }
+  adminCache.set(chave, r);
+  return r;
+}
+
+/* Aplica a classificação a uma lista de leads (em memória, sem rede) */
+function classificarLeads(leads) {
+  if (!adminDados) return 0;
+  let n = 0;
+  for (const l of leads) {
+    if (l.distrito !== ND && l.concelho !== ND) continue;
+    const a = resolvePortugalAdministrativeArea(l.lat, l.lon);
+    if (a.municipality) { l.concelho = a.municipality; l.distrito = a.district || ND; n++; }
+  }
+  return n;
+}
+
 /* ---------- Adaptadores (nunca lançam) ---------- */
 const SourceAdapters = {
   /* Uma consulta Google (nearby por tipo, ou text com contexto geográfico) */
@@ -1807,9 +2043,13 @@ const SourceAdapters = {
     }
   },
 
-  /* Overpass: uma consulta cobre todo o raio (sem teto de 20). Opcional. */
-  async overpass({ lat, lon, radiusKm, nicheKeys, keyword }) {
-    const query = buildOverpassQuery({ lat, lon, radiusM: Math.round(radiusKm * 1000), nicheKeys, keyword });
+  /* Overpass: uma consulta cobre todo o raio (sem teto de 20). Opcional.
+     Com `bbox`, cobre uma caixa geográfica — usado no modo Portugal, onde
+     uma única consulta traz o país inteiro. */
+  async overpass({ lat, lon, radiusKm, nicheKeys, keyword, bbox }) {
+    const query = bbox
+      ? buildOverpassQuery({ bbox, nicheKeys, keyword })
+      : buildOverpassQuery({ lat, lon, radiusM: Math.round(radiusKm * 1000), nicheKeys, keyword });
     let ultimoErro = null;
     for (const endpoint of CONFIG.overpassEndpoints) {
       try {
@@ -1886,6 +2126,18 @@ function planearConsultas({ lat, lon, radiusKm, nicheKeys, keyword }) {
   return plano;
 }
 
+/* Cache do modo Portugal: nicho|zona → leads brutos (evita repetir a mesma
+   pesquisa nacional imediatamente a seguir). */
+const cacheNacional = new Map();
+const CACHE_NACIONAL_TTL = 10 * 60 * 1000;
+function chaveCache(nicho, zonaId, keyword) { return (nicho || '-') + '|' + zonaId + '|' + (keyword || ''); }
+function lerCacheNacional(k) {
+  const c = cacheNacional.get(k);
+  if (!c) return null;
+  if (Date.now() - c.t > CACHE_NACIONAL_TTL) { cacheNacional.delete(k); return null; }
+  return c.leads;
+}
+
 /* ---------- Motor ---------- */
 const SearchEngine = {
   async run({ lat, lon, radiusKm, nicheKeys, keyword, onStatus, onBatch, contarUnicos, onTardio, geracao }) {
@@ -1955,12 +2207,99 @@ const SearchEngine = {
     }
 
     if (onStatus) onStatus('A consolidar resultados…');
-    /* o OSM tem prazo: passado isto a pesquisa fecha com o que já tem, mas a
+    /* NOTA: o bloco abaixo pertence a run(); runNacional está mais adiante.
+       o OSM tem prazo: passado isto a pesquisa fecha com o que já tem, mas a
        fonte NÃO é dada como indisponível — continua a decorrer e, se responder,
        os resultados entram por onTardio. Só uma falha real a marca indisponível. */
     const restante = Math.max(0, SEARCH_BUDGET.overpassPrazo - (Date.now() - inicio));
     await Promise.race([overpassPromise, sleep(restante)]);
     jaFechou = true;
+    if (estado.fontes.osm === 'por_consultar') estado.fontes.osm = 'atrasado';
+    emitir();
+    return { rawLeads: acumulado, estado };
+  },
+
+  /* ---------------------------------------------------------------------
+     Modo PORTUGAL — cobertura territorial por zonas.
+     Nunca usa um raio gigante: divide o continente numa grelha e consulta
+     cada zona com um raio pequeno. O OSM cobre o país numa única consulta
+     por caixa geográfica. A grelha adapta-se ao teto de pedidos em vez de
+     o ultrapassar (menos zonas, mais largas, mas sempre o país inteiro).
+     --------------------------------------------------------------------- */
+  async runNacional({ nicheKeys, keyword, onStatus, onBatch, onZona, contarUnicos, geracao, cancelado }) {
+    const nichos = (nicheKeys || []).filter(k => GOOGLE_NICHE_QUERY[k]);
+    const tipos = nichos.reduce((n, k) => n + GOOGLE_NICHE_QUERY[k].types.length, 0) || 1;
+    const teto = SEARCH_BUDGET.maxRequestsNacional;
+
+    /* grelha adaptada ao orçamento: alarga o espaçamento até caber */
+    let espacamento = SEARCH_BUDGET.espacamentoNacionalKm;
+    let zonas = searchGridPortugal(espacamento);
+    while (zonas.length * tipos > teto - 1 && espacamento < 140) {
+      espacamento += 10;
+      zonas = searchGridPortugal(espacamento);
+    }
+    const raioZonaKm = Math.min(50, Math.round(espacamento * 0.75));
+
+    const estado = {
+      modo: 'portugal', pedidos: 0, teto,
+      fontes: { google: 'por_consultar', osm: 'por_consultar' },
+      googleLeads: 0, osmLeads: 0, erros: [],
+      zonas: { total: zonas.length, feitas: 0, espacamentoKm: espacamento, raioKm: raioZonaKm },
+      cancelada: false
+    };
+    const acumulado = [];
+    const emitir = () => { if (onBatch) { try { onBatch(acumulado.slice(), estado); } catch (e) { console.warn('[Nacional] onBatch', e); } } };
+    const unicos = () => (contarUnicos ? contarUnicos(acumulado) : acumulado.length);
+
+    /* OSM: uma consulta cobre o continente inteiro */
+    const osmPromise = (async () => {
+      estado.pedidos++;
+      const r = await SourceAdapters.overpass({ bbox: PT_BBOX, nicheKeys: nichos, keyword });
+      if (geracao != null && geracao !== state.searchGen) return r;
+      if (r.ok) { estado.fontes.osm = 'ok'; estado.osmLeads = r.leads.length; acumulado.push(...r.leads); emitir(); }
+      else { estado.fontes.osm = 'indisponivel'; estado.erros.push({ fonte: 'osm', msg: (r.erro && r.erro.message) || 'indisponível' }); }
+      return r;
+    })();
+
+    /* Google: zonas em lotes pequenos, com cache por nicho+zona */
+    const raioM = raioZonaKm * 1000;
+    for (let i = 0; i < zonas.length; i += SEARCH_BUDGET.concorrenciaNacional) {
+      if (cancelado && cancelado()) { estado.cancelada = true; break; }
+      if (estado.pedidos >= teto) break;
+      const lote = zonas.slice(i, i + SEARCH_BUDGET.concorrenciaNacional);
+      const consultas = [];
+      for (const z of lote) {
+        for (const k of nichos) {
+          for (const t of GOOGLE_NICHE_QUERY[k].types) consultas.push({ zona: z, nicho: k, googleType: t });
+        }
+        if (!nichos.length && keyword) consultas.push({ zona: z, nicho: null, termo: keyword });
+      }
+      const resultados = await Promise.all(consultas.map(async c => {
+        const chave = chaveCache(c.nicho || c.termo, c.zona.id, keyword);
+        const emCache = lerCacheNacional(chave);
+        if (emCache) return { ok: true, leads: emCache, cache: true };
+        estado.pedidos++;
+        const r = c.termo
+          ? await SourceAdapters.google({ tipoConsulta: 'text', termo: c.termo + ' ' + c.zona.district, nicho: null, lat: c.zona.lat, lon: c.zona.lon, radiusM: raioM })
+          : await SourceAdapters.google({ tipoConsulta: 'nearby', googleType: c.googleType, nicho: c.nicho, lat: c.zona.lat, lon: c.zona.lon, radiusM: raioM });
+        if (r.ok) cacheNacional.set(chave, { t: Date.now(), leads: r.leads });
+        return r;
+      }));
+      let algumOk = false;
+      for (const r of resultados) {
+        if (r.ok) { algumOk = true; estado.googleLeads += r.leads.length; acumulado.push(...r.leads); }
+        else if (r.erro) estado.erros.push({ fonte: 'google', msg: r.erro.userMessage || r.erro.message });
+      }
+      if (algumOk) estado.fontes.google = 'ok';
+      else if (estado.fontes.google === 'por_consultar') estado.fontes.google = 'indisponivel';
+      estado.zonas.feitas = Math.min(i + lote.length, zonas.length);
+      emitir();
+      if (onZona) onZona(estado.zonas.feitas, zonas.length, unicos(), estado);
+      if (onStatus) onStatus('A pesquisar Portugal — zona ' + estado.zonas.feitas + ' de ' + zonas.length + ' · ' + unicos() + ' leads únicos');
+    }
+
+    if (onStatus) onStatus('A consolidar resultados nacionais…');
+    await Promise.race([osmPromise, sleep(SEARCH_BUDGET.overpassPrazo)]);
     if (estado.fontes.osm === 'por_consultar') estado.fontes.osm = 'atrasado';
     emitir();
     return { rawLeads: acumulado, estado };
@@ -1972,17 +2311,33 @@ function setStatus(text) { $('#searchStatus').textContent = text; }
 
 /* Registos brutos → leads limpos, dentro do raio, sem duplicados e ordenados.
    Usado tanto nos lotes progressivos como na consolidação final. */
-function consolidar(rawLeads, center, dateStr, radiusKm) {
+function consolidar(rawLeads, center, dateStr, radiusKm, limite) {
   let cleaned = rawLeads.map(r => cleanLead(r, center, dateStr));
   cleaned = cleaned.filter(l => l.distanciaKm <= radiusKm + 0.05);   /* nunca fora do raio pedido */
   const { leads, merged } = DataCleaner.dedupe(cleaned);
   leads.sort((a, b) => a.distanciaKm - b.distanciaKm);
+  const teto = limite || CONFIG.maxResults;
   let truncated = 0;
-  if (leads.length > CONFIG.maxResults) { truncated = leads.length - CONFIG.maxResults; leads.length = CONFIG.maxResults; }
+  if (leads.length > teto) { truncated = leads.length - teto; leads.length = teto; }
   return { leads, merged, truncated };
 }
 
 /* Aviso discreto quando uma fonte esteve indisponível — nunca como falha da pesquisa */
+/* Resumo territorial da pesquisa nacional, calculado dos resultados reais */
+function mostrarResumoNacional(estado) {
+  hideBanner('nacional');
+  if (!estado || estado.modo !== 'portugal') return;
+  const distritos = new Set(state.leads.map(l => l.distrito).filter(v => v && v !== ND));
+  const concelhos = new Set(state.leads.map(l => l.concelho).filter(v => v && v !== ND));
+  const n = v => v.toLocaleString('pt-PT');
+  showBanner('nacional', 'info',
+    '<strong>Portugal — ' + n(state.leads.length) + ' empresas únicas.</strong> ' +
+    distritos.size + (distritos.size === 1 ? ' distrito' : ' distritos') + ' · ' +
+    concelhos.size + (concelhos.size === 1 ? ' concelho' : ' concelhos') + ' · ' +
+    estado.zonas.feitas + ' de ' + estado.zonas.total + ' zonas pesquisadas' +
+    (estado.cancelada ? ' (pesquisa cancelada)' : '') + '.');
+}
+
 function mostrarEstadoFontes(estado) {
   hideBanner('fontes');
   state.ultimoEstadoFontes = estado || null;
@@ -2018,6 +2373,7 @@ async function runSearch(p) {
   state.lastParams = p;
   /* identifica esta pesquisa: respostas tardias de pesquisas antigas são ignoradas */
   const geracao = state.searchGen = (state.searchGen || 0) + 1;
+  state.cancelarPesquisa = false;
   hideBanner('searchError');
   setLoading(true);
   setStatus('A preparar a pesquisa…');
@@ -2043,7 +2399,7 @@ async function runSearch(p) {
 
     /* limpar filtros/seleção antes dos primeiros resultados (render progressivo) */
     state.selected.clear();
-    state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false };
+    state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '' };
     $('#tableFilter').value = '';
     $('#togglePhone').checked = false;
     $('#toggleSite').checked = false;
@@ -2053,11 +2409,33 @@ async function runSearch(p) {
     /* 2. Obter empresas (demo, ou motor multi-fonte) */
     let rawLeads, motorEstado = null;
     const consolidarAqui = raw => consolidar(raw, center, state.searchMeta.dateStr, p.radiusKm);
+    /* no modo Portugal não há raio a limitar: a cobertura é territorial */
+    const consolidarNacional = raw => consolidar(raw, center, state.searchMeta.dateStr, Infinity, CONFIG.maxResultsNacional);
     if (p.demo || IS_FILE) {
       setStatus('A carregar dados de demonstração…');
       await sleep(reduceMotion ? 0 : 350);
       rawLeads = demoSearch(p);
       state.currentSource = 'demo';
+    } else if (state.modo === 'portugal') {
+      /* Modo Portugal: cobertura territorial por zonas (sem raio gigante) */
+      $('#btnCancelar').hidden = false;
+      const r = await SearchEngine.runNacional({
+        nicheKeys: p.nicheKeys.filter(k => k !== 'personalizado'),
+        keyword: p.keyword,
+        onStatus: setStatus,
+        contarUnicos: raw => consolidarNacional(raw).leads.length,
+        geracao,
+        cancelado: () => state.cancelarPesquisa,
+        onBatch: raw => {
+          if (geracao !== state.searchGen) return;
+          state.leads = consolidarNacional(raw).leads;
+          renderAll();
+        }
+      });
+      rawLeads = r.rawLeads;
+      motorEstado = r.estado;
+      state.currentSource = motorEstado.fontes.google === 'ok' && motorEstado.fontes.osm === 'ok'
+        ? 'google+osm' : motorEstado.fontes.google === 'ok' ? 'google' : 'osm';
     } else {
       const r = await SearchEngine.run({
         lat: center.lat, lon: center.lon, radiusKm: p.radiusKm,
@@ -2092,7 +2470,22 @@ async function runSearch(p) {
 
     /* 3. Limpeza, deduplicação, distância e ordenação (consolidação final) */
     setStatus('A limpar e normalizar os dados…');
-    const { leads, merged, truncated } = consolidarAqui(rawLeads);
+    await carregarLimitesAdmin();   /* uma vez por sessão; sem pedidos por lead */
+    const consolidarFinal = state.modo === 'portugal' ? consolidarNacional : consolidarAqui;
+    const { leads, merged, truncated } = consolidarFinal(rawLeads);
+    const tClass = performance.now();
+    const classificados = classificarLeads(leads);
+    state.tempoClassificacaoMs = Math.round(performance.now() - tClass);
+    state.classificados = classificados;
+    /* Modo Portugal: as zonas de fronteira apanham empresas espanholas.
+       Não pertencer a nenhum concelho português é o critério para as excluir. */
+    state.foraDePortugal = 0;
+    if (state.modo === 'portugal' && adminDados) {
+      const soPT = leads.filter(l => l.concelho && l.concelho !== ND);
+      state.foraDePortugal = leads.length - soPT.length;
+      leads.length = 0;
+      Array.prototype.push.apply(leads, soPT);
+    }
 
     /* 4. Estado + render */
     state.leads = leads;
@@ -2101,11 +2494,14 @@ async function runSearch(p) {
     saveHistoryEntry(p, leads.length);
     if (state.currentSource === 'demo') showDemoBanner(); else hideBanner('demo');
     mostrarEstadoFontes(motorEstado);
+    mostrarResumoNacional(motorEstado);
 
     const secs = ((performance.now() - t0) / 1000).toLocaleString('pt-PT', { maximumFractionDigits: 1 });
     let msg = leads.length + ' leads encontrados em ' + secs + ' s';
     if (merged) msg += ' · ' + merged + ' duplicados unidos';
     if (motorEstado) msg += ' · ' + motorEstado.pedidos + ' consultas';
+    if (motorEstado && motorEstado.zonas) msg += ' · ' + motorEstado.zonas.feitas + '/' + motorEstado.zonas.total + ' zonas';
+    if (motorEstado && motorEstado.cancelada) msg += ' · pesquisa cancelada';
     if (truncated) msg += ' · a mostrar os ' + CONFIG.maxResults + ' mais próximos';
     toast(msg, leads.length ? 'success' : 'info', 6000);
   } catch (err) {
@@ -2117,6 +2513,7 @@ async function runSearch(p) {
     ]);
   } finally {
     setLoading(false);
+    $('#btnCancelar').hidden = true;
   }
 }
 
@@ -2193,6 +2590,8 @@ function computeFiltered() {
     if (!f.niches.has(l.nicho)) return false;
     if (f.phoneOnly && l.telefone === ND && l.telemovel === ND) return false;
     if (f.siteOnly && l.website === ND) return false;
+    if (f.distrito && l.distrito !== f.distrito) return false;
+    if (f.concelho && l.concelho !== f.concelho) return false;
     if (txt) {
       const hay = normalizeStr([l.nome, l.segmento, l.morada, l.localidade, l.codigoPostal].join(' '));
       if (!hay.includes(txt)) return false;
@@ -2259,7 +2658,21 @@ function renderTable(opts) {
     h += '</tr>';
     return h;
   });
-  tbody.innerHTML = rows.join('');
+  /* Com milhares de leads, escrever tudo de uma vez bloqueia o browser.
+     Escreve-se o primeiro lote já, e o resto em lotes por requestAnimationFrame. */
+  const LOTE = 200;
+  if (renderTable._pendente) { cancelAnimationFrame(renderTable._pendente); renderTable._pendente = null; }
+  tbody.innerHTML = rows.slice(0, LOTE).join('');
+  if (rows.length > LOTE) {
+    let i = LOTE;
+    const proximo = () => {
+      if (i >= rows.length) { renderTable._pendente = null; updateCheckAll(); return; }
+      tbody.insertAdjacentHTML('beforeend', rows.slice(i, i + LOTE).join(''));
+      i += LOTE;
+      renderTable._pendente = requestAnimationFrame(proximo);
+    };
+    renderTable._pendente = requestAnimationFrame(proximo);
+  }
   updateCheckAll();
   updateSortHeaders();
 }
@@ -2269,6 +2682,24 @@ function updateSortHeaders() {
     if (th.dataset.sort === state.sort.key) th.setAttribute('aria-sort', state.sort.dir === 'asc' ? 'ascending' : 'descending');
     else th.setAttribute('aria-sort', 'none');
   });
+}
+
+/* Listas de distrito/concelho construídas a partir dos leads reais.
+   Só aparecem valores que vieram do endereço — nada é inferido. */
+function renderFiltrosTerritoriais() {
+  const encher = (sel, campo, rotulo, filtrarPor) => {
+    const el = $(sel);
+    if (!el) return;
+    const base = filtrarPor ? state.leads.filter(l => l.distrito === filtrarPor) : state.leads;
+    const valores = Array.from(new Set(base.map(l => l[campo]).filter(v => v && v !== ND))).sort((a, b) => a.localeCompare(b, 'pt'));
+    const atual = state.filters[campo];
+    if (atual && !valores.includes(atual)) valores.push(atual);
+    el.innerHTML = '<option value="">' + rotulo + '</option>' +
+      valores.map(v => '<option value="' + esc(v) + '"' + (v === atual ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+    el.disabled = !valores.length;
+  };
+  encher('#filtroDistrito', 'distrito', 'Todos os distritos', null);
+  encher('#filtroConcelho', 'concelho', 'Todos os concelhos', state.filters.distrito || null);
 }
 
 function renderChips() {
@@ -2378,6 +2809,7 @@ function renderMapLegend() {
 function renderAll(opts) {
   computeFiltered();
   renderChips();
+  renderFiltrosTerritoriais();
   renderTable(opts);
   MapP().renderLeads(state.filtered);
   renderKPIs();
@@ -2395,6 +2827,8 @@ function leadsToRows(list) {
     'Morada': l.morada,
     'Código Postal': l.codigoPostal,
     'Localidade': l.localidade,
+    'Distrito': l.distrito || ND,
+    'Concelho': l.concelho || ND,
     'Telefone': l.telefone,
     'Telemóvel': l.telemovel,
     'Email': (l.emails && l.emails.length) ? l.emails.map(e => e.email).join('; ') : ND,
@@ -2411,7 +2845,7 @@ function leadsToRows(list) {
 }
 function buildWorkbook(list) {
   const ws = XLSX.utils.json_to_sheet(leadsToRows(list));
-  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 17 }, { wch: 17 }, { wch: 34 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 17 }];
+  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 16 }, { wch: 18 }, { wch: 17 }, { wch: 17 }, { wch: 34 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 17 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leads');
   return wb;
@@ -2726,6 +3160,40 @@ function bindEvents() {
     if (e.target.classList.contains('invalid') && e.target.value.trim().length >= 2) setFieldState(e.target, '', { neutral: true });
   });
 
+  /* Modo de pesquisa: Local (raio) ou Portugal (cobertura territorial) */
+  const definirModo = modo => {
+    state.modo = modo;
+    $('#modoLocal').setAttribute('aria-pressed', String(modo === 'local'));
+    $('#modoPortugal').setAttribute('aria-pressed', String(modo === 'portugal'));
+    /* no modo Portugal o raio deixa de fazer sentido */
+    $('#locPill').classList.toggle('loc-pill-atenuado', modo === 'portugal');
+    $('#locRadius').textContent = modo === 'portugal' ? 'Portugal continental' : 'raio ' + state.radiusKm + ' km';
+    toast(modo === 'portugal'
+      ? 'Modo Portugal: a próxima pesquisa cobre o continente por zonas, sem raio.'
+      : 'Modo Local: pesquisa por raio a partir do ponto escolhido.', 'info', 5000);
+  };
+  $('#modoLocal').addEventListener('click', () => definirModo('local'));
+  $('#modoPortugal').addEventListener('click', () => definirModo('portugal'));
+
+  /* Cancelar: pára novos pedidos, mantém o que já foi encontrado */
+  $('#btnCancelar').addEventListener('click', () => {
+    state.cancelarPesquisa = true;
+    setStatus('A cancelar — a manter os resultados já encontrados…');
+    $('#btnCancelar').disabled = true;
+    setTimeout(() => { $('#btnCancelar').disabled = false; }, 3000);
+  });
+
+  /* Filtros territoriais */
+  $('#filtroDistrito').addEventListener('change', e => {
+    state.filters.distrito = e.target.value;
+    state.filters.concelho = '';   /* concelho depende do distrito */
+    renderAll();
+  });
+  $('#filtroConcelho').addEventListener('change', e => {
+    state.filters.concelho = e.target.value;
+    renderAll();
+  });
+
   /* Filtros da tabela */
   $('#tableFilter').addEventListener('input', e => {
     state.filters.text = e.target.value;
@@ -2871,6 +3339,9 @@ async function init() {
    interface, e nunca inventa URLs: só aceita o que o endpoint validou.
    Não toca em runSearch, PlacesProviders, MapProviders nem na exportação.
    ===================================================================== */
+/* Quantos leads são enfileirados de cada vez para enriquecimento. Impede
+   que uma pesquisa nacional de milhares dispare milhares de pedidos. */
+const ENRIQUECIMENTO_MAX_POR_PASSAGEM = 150;
 const SOCIAL_NETS = ['instagram', 'facebook', 'tiktok', 'youtube', 'linkedin'];
 const SOCIAL_META = {
   instagram: { sigla: 'IG', nome: 'Instagram' },
@@ -3003,7 +3474,11 @@ function pumpSocialQueue() {
 function startSocialEnrichment() {
   if (IS_FILE) return;                              /* file:// não faz pedidos */
   if (state.currentSource === 'demo') return;       /* dados fictícios: não contactar domínios .example */
-  for (const l of state.leads) {
+  if (state.loading) return;                        /* nacional: só depois de a pesquisa terminar */
+  /* enriquece o que está à vista (filtrado), não milhares de leads de uma vez */
+  let restantes = ENRIQUECIMENTO_MAX_POR_PASSAGEM;
+  for (const l of (state.filtered.length ? state.filtered : state.leads)) {
+    if (restantes-- <= 0) break;
     if (!l || !l.id) continue;
     if (socialEnrichmentCache.has(l.id) || socialEnrichmentInFlight.has(l.id)) continue;
     if (socialQueue.some(x => x.id === l.id)) continue;
@@ -3145,7 +3620,10 @@ function pumpEmailQueue() {
 function startEmailEnrichment() {
   if (IS_FILE) return;
   if (state.currentSource === 'demo') return;   /* dados fictícios: não contactar domínios .example */
-  for (const l of state.leads) {
+  if (state.loading) return;                    /* nacional: só depois de a pesquisa terminar */
+  let restantes = ENRIQUECIMENTO_MAX_POR_PASSAGEM;
+  for (const l of (state.filtered.length ? state.filtered : state.leads)) {
+    if (restantes-- <= 0) break;
     if (!l || !l.id) continue;
     if (emailEnrichmentCache.has(l.id) || emailEnrichmentInFlight.has(l.id)) continue;
     if (emailQueue.some(x => x.id === l.id)) continue;
