@@ -332,6 +332,7 @@ input[type="checkbox"] { accent-color: var(--ink); width: 15px; height: 15px; cu
 .results { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-sm); overflow: hidden; }
 .results-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .results-title { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+.results-scope { font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46ch; }
 .results-count { font: 600 11.5px/1 var(--mono); color: var(--muted); background: var(--surface-3); border: 1px solid var(--border); padding: 4px 8px; border-radius: 999px; }
 .results-spacer { flex: 1; }
 .tfilter { position: relative; }
@@ -514,6 +515,18 @@ table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-wid
 .niche-check .n-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--b-c); flex: none; }
 .niche-check .n-name { font-size: 13px; font-weight: 600; color: var(--text); }
 .niche-check:has(input:checked) { background: var(--b-bg); border-color: color-mix(in srgb, var(--b-c) 40%, var(--border)); }
+/* Pesquisa universal: campo principal + sugestões rápidas */
+.query-grande { width: 100%; height: 46px; font-size: 15px; font-weight: 500; }
+.sugestoes-t { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 8px; }
+.sugestoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.sugestoes button {
+  height: 30px; padding: 0 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  font: 500 12.5px/1 var(--font); color: var(--text-2);
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.sugestoes button:hover { background: var(--surface-3); border-color: var(--border-strong); color: var(--text); }
+.sugestoes button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
 .reveal { margin-top: 12px; }
 .modal-foot {
   display: flex; align-items: center; gap: 10px; padding: 14px 20px; margin-top: 6px;
@@ -648,7 +661,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <section class="kpis" aria-label="Indicadores">
     <div class="kpi" id="kpiFound"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Leads encontrados</span><span class="kpi-m" id="kpiFoundM"></span></div>
     <div class="kpi kpi-sel" id="kpiSel"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Selecionados</span><span class="kpi-m" id="kpiSelM"></span></div>
-    <div class="kpi" id="kpiNiches"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Nichos</span><span class="kpi-m" id="kpiNichesM"></span></div>
+    <div class="kpi" id="kpiEmail"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Com email</span><span class="kpi-m" id="kpiEmailM"></span></div>
     <div class="kpi" id="kpiSite"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Com website</span><span class="kpi-m" id="kpiSiteM"></span></div>
     <div class="kpi" id="kpiMobile"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Com telemóvel</span><span class="kpi-m" id="kpiMobileM"></span></div>
     <div class="kpi" id="kpiSocial"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Com redes sociais</span><span class="kpi-m" id="kpiSocialM"></span></div>
@@ -702,9 +715,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <!-- Resultados -->
   <section class="results" aria-label="Resultados">
     <div class="results-head">
-      <span class="results-title">Resultados</span>
+      <span class="results-title" id="resultsTitle">Resultados</span>
+      <span class="results-scope" id="resultsScope" hidden></span>
       <span class="results-count mono" id="resultsCount">0</span>
       <div class="results-spacer"></div>
+      <select class="tsel" id="filtroTipo" aria-label="Filtrar por tipo de resultado"><option value="">Todos os tipos</option><option value="BUSINESS">Empresa registada</option><option value="UNKNOWN">Não determinado</option></select>
       <select class="tsel" id="filtroDistrito" aria-label="Filtrar por distrito"><option value="">Todos os distritos</option></select>
       <select class="tsel" id="filtroConcelho" aria-label="Filtrar por concelho"><option value="">Todos os concelhos</option></select>
       <label class="tcheck" for="togglePhone"><input type="checkbox" id="togglePhone"> Apenas com telefone</label>
@@ -797,6 +812,29 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <form id="searchForm" novalidate>
       <div class="modal-body">
         <fieldset class="fgroup">
+          <legend>O que pretende pesquisar?</legend>
+          <div class="field">
+            <input type="text" id="fQuery" class="query-grande" autocomplete="off" maxlength="80"
+                   placeholder="Ex.: eletricistas, advogados, fotógrafos, empresas de limpeza…"
+                   aria-label="Atividade, profissão, categoria ou segmento a pesquisar">
+            <small class="ferr" id="err-fQuery" role="alert" hidden></small>
+            <div class="fhint">Qualquer atividade, profissão ou segmento com presença pública — empresas, estabelecimentos ou profissionais independentes.</div>
+          </div>
+          <div class="sugestoes-t">Sugestões rápidas</div>
+          <div class="sugestoes" id="sugestoes">
+            <button type="button" data-q="imobiliárias">Imobiliárias</button>
+            <button type="button" data-q="clínicas dentárias">Clínicas dentárias</button>
+            <button type="button" data-q="clínicas de estética">Estética</button>
+            <button type="button" data-q="stands automóveis">Automóvel</button>
+            <button type="button" data-q="eletricistas">Eletricistas</button>
+            <button type="button" data-q="advogados">Advogados</button>
+            <button type="button" data-q="contabilistas">Contabilistas</button>
+            <button type="button" data-q="fotógrafos">Fotógrafos</button>
+            <button type="button" data-q="empresas de limpeza">Empresas de limpeza</button>
+            <button type="button" data-q="restaurantes">Restaurantes</button>
+          </div>
+        </fieldset>
+        <fieldset class="fgroup">
           <legend>Localização central</legend>
           <div class="grid2">
             <div class="field span2">
@@ -827,25 +865,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <input type="radio" name="fRaio" id="rCustom" value="custom"><label for="rCustom">Personalizado</label>
           </div>
           <div class="field reveal" id="raioCustomWrap" hidden>
-            <label for="fRaioCustom">Raio personalizado (1–100 km)</label>
-            <input type="number" id="fRaioCustom" min="1" max="100" step="1" placeholder="ex.: 15">
+            <label for="fRaioCustom">Raio personalizado (mín. 1 km)</label>
+            <input type="number" id="fRaioCustom" min="1" step="1" placeholder="ex.: 15">
             <small class="ferr" id="err-fRaioCustom" role="alert" hidden></small>
-          </div>
-        </fieldset>
-        <fieldset class="fgroup">
-          <legend>Nichos</legend>
-          <div class="niche-checks" id="nicheChecks">
-            <label class="niche-check b-imobiliario"><input type="checkbox" value="imobiliario" checked><span class="n-dot"></span><span class="n-name">Imobiliário</span></label>
-            <label class="niche-check b-saude"><input type="checkbox" value="saude" checked><span class="n-dot"></span><span class="n-name">Saúde / Odontologia</span></label>
-            <label class="niche-check b-estetica"><input type="checkbox" value="estetica" checked><span class="n-dot"></span><span class="n-name">Estética</span></label>
-            <label class="niche-check b-automovel"><input type="checkbox" value="automovel" checked><span class="n-dot"></span><span class="n-name">Automóvel</span></label>
-            <label class="niche-check b-personalizado span2"><input type="checkbox" value="personalizado" id="nPersonalizado"><span class="n-dot"></span><span class="n-name">Personalizado (palavra-chave)</span></label>
-          </div>
-          <small class="ferr" id="err-nichos" role="alert" hidden></small>
-          <div class="field reveal" id="keywordWrap" hidden>
-            <label for="fKeyword">Palavra-chave <span aria-hidden="true">*</span></label>
-            <input type="text" id="fKeyword" autocomplete="off" placeholder="ex.: contabilidade, ginásio, pet shop…">
-            <small class="ferr" id="err-fKeyword" role="alert" hidden></small>
           </div>
         </fieldset>
       </div>
@@ -894,7 +916,9 @@ const CONFIG = {
   defaultCenter: { lat: 38.8151413, lon: -9.2206841, label: 'R. de São José 3, Caneças' },
   defaultMeta: { morada: 'R. de São José 3', cp: '1685-031', cidade: 'Caneças' },
   defaultRadiusKm: 30,
-  maxResults: 500,               // MODO LOCAL: os 500 mais próximos do centro
+  maxResults: 500,               // MODO LOCAL até 50 km: os 500 mais próximos
+  maxResultsLocalGrande: 10000,  // MODO LOCAL acima de 50 km: mantém tudo (teto de segurança)
+  raioGrandeKm: 50,              // acima deste raio o teto passa a ser o grande
   maxResultsNacional: 20000,     // MODO PORTUGAL: mantém tudo (teto só de segurança)
   mapProvider: 'osm',            // 'osm' | 'google'  ← trocar aqui quando o Google estiver configurado
   placesProvider: 'overpass',    // 'overpass' | 'google'
@@ -946,7 +970,7 @@ const state = {
   leads: [],
   filtered: [],
   selected: new Set(),
-  filters: { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '' },
+  filters: { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '', tipo: '' },
   modo: 'local',            /* 'local' | 'portugal' */
   cancelarPesquisa: false,
   sort: { key: 'distanciaKm', dir: 'asc' },
@@ -956,6 +980,11 @@ const state = {
   loading: false,
   lastParams: null
 };
+/* A pesquisa universal é conduzida pelo texto escrito pelo utilizador.
+   Nome único de leitura, sem estado duplicado que possa divergir. */
+Object.defineProperty(state, 'searchQuery', {
+  get() { return (this.searchMeta && this.searchMeta.keyword) || ''; }
+});
 
 /* ---------- 3. Utilitários ---------- */
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -1128,7 +1157,7 @@ const DataCleaner = {
     if (Math.abs(a.length - b.length) / max > 0.5) return 0;
     return 1 - levenshtein(a, b) / max;
   },
-  MERGE_FIELDS: ['nome', 'segmento', 'morada', 'codigoPostal', 'localidade', 'distrito', 'concelho', 'telefone', 'telemovel', 'website', 'instagram', 'facebook', 'linkedin', 'fonte'],
+  MERGE_FIELDS: ['nome', 'leadType', 'segmento', 'morada', 'codigoPostal', 'localidade', 'distrito', 'concelho', 'telefone', 'telemovel', 'website', 'instagram', 'facebook', 'linkedin', 'fonte'],
   filledScore(l) { return this.MERGE_FIELDS.reduce((n, f) => n + (l[f] && l[f] !== ND ? 1 : 0), 0); },
   mergeLead(base, extra) {
     /* o registo mais completo fica como base; o outro preenche lacunas */
@@ -1142,6 +1171,8 @@ const DataCleaner = {
     }
     /* união das fontes: a mesma empresa pode vir da Google e do OSM */
     base.fontes = Array.from(new Set([...(base.fontes || []), ...(extra.fontes || [])]));
+    /* união das pesquisas: o mesmo negócio pode responder a várias queries */
+    base.searchQueries = Array.from(new Set([...(base.searchQueries || []), ...(extra.searchQueries || [])]));
   },
   /* Deduplicação: telefone / website / nome semelhante + proximidade (<~500 m) ou mesmo CP */
   dedupe(list) {
@@ -1182,6 +1213,17 @@ const DataCleaner = {
 };
 
 /* Registo bruto → lead limpo e completo */
+/* Tipo de resultado (§7) — deliberadamente conservador.
+   BUSINESS só quando o nome público contém uma forma jurídica registada
+   (Lda., S.A., Unipessoal, SGPS, CRL…). Tudo o resto fica UNKNOWN.
+   NUNCA se infere "profissional independente" / "recibos verdes" / "empresário
+   em nome individual": nenhuma fonte pública usada aqui prova isso, e um nome
+   com aspeto de pessoa não é prova de nada. Sem fonte, não se afirma. */
+const FORMA_JURIDICA = /(^|[\s,.\-])(l\.?da\.?|limitada|s\.?a\.?|sociedade|unipessoal|sgps|crl|s\.?g\.?p\.?s\.?|ace|eirl)($|[\s,.\-])/i;
+function tipoDeLead(nome) {
+  if (!nome || nome === ND) return 'UNKNOWN';
+  return FORMA_JURIDICA.test(nome) ? 'BUSINESS' : 'UNKNOWN';
+}
 function cleanLead(raw, center, dataPesquisa) {
   const C = DataCleaner;
   const phones = C.parsePhones(raw.telefoneRaw);
@@ -1204,6 +1246,7 @@ function cleanLead(raw, center, dataPesquisa) {
     linkedin: C.nd(raw.linkedin),
     distanciaKm: Math.round(haversineKm(center.lat, center.lon, raw.lat, raw.lon) * 10) / 10,
     fonte: C.nd(raw.fonte),
+    leadType: tipoDeLead(C.cleanName(raw.nome)),
     fontes: Array.isArray(raw.fontes) ? raw.fontes.slice() : [],   /* rasto multi-fonte */
     dataPesquisa,
     socials: emptySocials(),  /* preenchido depois, em segundo plano (secção 20) */
@@ -1239,12 +1282,11 @@ const Validator = {
     fRaioCustom: v => {
       if (!$('#rCustom').checked) return '';
       const n = Number(v);
-      return Number.isFinite(n) && n >= 1 && n <= 100 ? '' : 'Indique um raio entre 1 e 100 km.';
+      return Number.isFinite(n) && n >= 1 ? '' : 'Indique um raio válido a partir de 1 km.';
     },
-    fKeyword: v => {
-      if (!$('#nPersonalizado').checked) return '';
-      return v.trim().length >= 3 ? '' : 'Indique uma palavra-chave com pelo menos 3 caracteres.';
-    }
+    /* Pesquisa universal: só se bloqueia o campo vazio. Qualquer atividade,
+       profissão ou segmento é aceite — não há lista fechada de termos. */
+    fQuery: v => v.trim() ? '' : 'Indique uma atividade, profissão, categoria ou segmento.',
   },
   validateField(id) {
     const el = document.getElementById(id);
@@ -1252,21 +1294,12 @@ const Validator = {
     setFieldState(el, msg);
     return !msg;
   },
-  validateNiches() {
-    const any = $$('#nicheChecks input:checked').length > 0;
-    const err = $('#err-nichos');
-    if (any) { err.hidden = true; err.textContent = ''; }
-    else { err.innerHTML = ic('alert') + '<span>Selecione pelo menos um nicho.</span>'; err.hidden = false; }
-    return any;
-  },
   validateForm() {
-    const ids = ['fMorada', 'fCP', 'fCidade', 'fRaioCustom', 'fKeyword'];
+    const ids = ['fQuery', 'fMorada', 'fCP', 'fCidade', 'fRaioCustom'];
     let firstBad = null;
     for (const id of ids) {
       if (!this.validateField(id) && !firstBad) firstBad = document.getElementById(id);
     }
-    const nichesOk = this.validateNiches();
-    if (!nichesOk && !firstBad) firstBad = $('#nicheChecks input');
     if (firstBad) { firstBad.focus(); return false; }
     return true;
   }
@@ -1428,10 +1461,19 @@ function buildOverpassQuery({ lat, lon, radiusM, nicheKeys, keyword, bbox }) {
   for (const k of nicheKeys) {
     for (const sel of (NICHES[k] ? NICHES[k].overpass : [])) parts.push('nwr' + sel + around + ';');
   }
+  /* Pesquisa universal: se a atividade escrita corresponder a tags OSM reais,
+     usá-las (muito mais preciso que procurar no nome). A procura por nome
+     abaixo continua a correr, para apanhar o que não está etiquetado. */
+  const atv = keyword ? reconhecerAtividade(keyword) : null;
+  if (atv) for (const sel of atv.osm) parts.push('nwr' + sel + around + ';');
   if (keyword) {
-    /* regex segura: remove metacarateres e liga palavras com ".*" */
-    const words = keyword.replace(/["\\~^$|()[\]{}?*+.]/g, ' ').trim().split(/\s+/).filter(Boolean);
-    if (words.length) parts.push('nwr["name"~"' + words.join('.*') + '",i]' + around + ';');
+    /* regex segura: remove metacarateres, descarta conectores e liga com ".*".
+       Não há expansão de sinónimos — apenas o texto do utilizador, limpo. */
+    const conectores = new Set(['de', 'da', 'do', 'dos', 'das', 'e', 'em', 'para', 'a', 'o', 'as', 'os', 'com']);
+    let words = keyword.replace(/["\\~^$|()[\]{}?*+.]/g, ' ').trim().split(/\s+/).filter(Boolean);
+    const semConectores = words.filter(w => !conectores.has(w.toLowerCase()));
+    if (semConectores.length) words = semConectores;
+    if (words.length) parts.push('nwr["name"~"' + words.slice(0, 4).join('.*') + '",i]' + around + ';');
   }
   const teto = bbox ? 5000 : 1500;
   return '[out:json][timeout:' + (bbox ? 120 : 45) + '];(\n' + parts.join('\n') + '\n);out center ' + teto + ';';
@@ -1814,6 +1856,73 @@ const SEARCH_BUDGET = {
   vagasFracasSeguidas: 2
 };
 
+/* =====================================================================
+   7c. Pesquisa universal por atividade
+   ---------------------------------------------------------------------
+   A query escrita pelo utilizador é a fonte primária. O dicionário abaixo
+   é APENAS uma otimização: quando a atividade é reconhecida, acrescenta
+   tipos oficiais da Google e tags reais do OSM às consultas de texto.
+   Nada aqui é inventado — os tipos Google foram verificados contra a API
+   e as tags OSM contra o taginfo. Uma query não reconhecida funciona na
+   mesma, por Text Search e por procura no nome (OSM).
+   ===================================================================== */
+function normalizarQuery(q) {
+  return String(q || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+/* chave de comparação: sem acentos, para o dicionário apanhar variantes */
+function chaveAtividade(q) {
+  return normalizarQuery(q).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+const ATIVIDADES = [
+  { termos: ['eletricista', 'eletricistas', 'electricista', 'instalacoes eletricas'], google: ['electrician'], osm: ['["craft"="electrician"]'] },
+  { termos: ['canalizador', 'canalizadores', 'canalizacao', 'picheleiro'], google: ['plumber'], osm: ['["craft"="plumber"]'] },
+  { termos: ['pintor', 'pintores', 'pinturas'], google: ['painter'], osm: ['["craft"="painter"]'] },
+  { termos: ['carpinteiro', 'carpinteiros', 'carpintaria'], google: [], osm: ['["craft"="carpenter"]'] },
+  { termos: ['serralheiro', 'serralheiros', 'serralharia'], google: ['locksmith'], osm: ['["craft"="locksmith"]', '["craft"="metal_construction"]'] },
+  { termos: ['fotografo', 'fotografos', 'fotografia', 'fotografos de casamento'], google: [], osm: ['["craft"="photographer"]', '["shop"="photo"]'] },
+  { termos: ['advogado', 'advogados', 'advocacia', 'sociedade de advogados'], google: ['lawyer'], osm: ['["office"="lawyer"]'] },
+  { termos: ['contabilista', 'contabilistas', 'contabilidade', 'gabinete de contabilidade'], google: ['accounting'], osm: ['["office"="accountant"]'] },
+  { termos: ['arquiteto', 'arquitetos', 'arquitectos', 'arquitetura', 'atelier de arquitetura'], google: [], osm: ['["office"="architect"]'] },
+  { termos: ['consultor', 'consultores', 'consultoria', 'consultores de marketing', 'consultoria de marketing'], google: [], osm: ['["office"="consulting"]'] },
+  { termos: ['imobiliaria', 'imobiliarias', 'mediacao imobiliaria', 'agencia imobiliaria'], google: ['real_estate_agency'], osm: ['["office"="estate_agent"]'] },
+  { termos: ['seguros', 'mediador de seguros', 'corretor de seguros'], google: ['insurance_agency'], osm: ['["office"="insurance"]'] },
+  { termos: ['cabeleireiro', 'cabeleireiros', 'barbeiro', 'barbeiros', 'barbearia'], google: ['hair_salon'], osm: ['["shop"="hairdresser"]'] },
+  { termos: ['esteticista', 'estetica', 'clinica de estetica', 'centro de estetica', 'manicure'], google: ['beauty_salon'], osm: ['["shop"="beauty"]'] },
+  { termos: ['dentista', 'dentistas', 'clinica dentaria', 'clinicas dentarias', 'medicina dentaria'], google: ['dentist'], osm: ['["amenity"="dentist"]', '["healthcare"="dentist"]'] },
+  { termos: ['clinica', 'clinicas', 'medico', 'medicos', 'consultorio medico'], google: ['doctor'], osm: ['["amenity"="clinic"]', '["healthcare"="clinic"]'] },
+  { termos: ['fisioterapeuta', 'fisioterapeutas', 'fisioterapia'], google: ['physiotherapist'], osm: ['["healthcare"="physiotherapist"]'] },
+  { termos: ['veterinario', 'veterinarios', 'clinica veterinaria'], google: ['veterinary_care'], osm: ['["amenity"="veterinary"]'] },
+  { termos: ['farmacia', 'farmacias'], google: [], osm: ['["amenity"="pharmacy"]'] },
+  { termos: ['ginasio', 'ginasios'], google: ['gym'], osm: ['["leisure"="fitness_centre"]'] },
+  { termos: ['restaurante', 'restaurantes'], google: ['restaurant'], osm: ['["amenity"="restaurant"]'] },
+  { termos: ['hotel', 'hoteis'], google: ['hotel'], osm: ['["tourism"="hotel"]'] },
+  { termos: ['stand', 'stands', 'stand automovel', 'stands automoveis', 'concessionario'], google: ['car_dealer'], osm: ['["shop"="car"]'] },
+  { termos: ['oficina', 'oficinas', 'oficina automovel', 'mecanico'], google: ['car_repair'], osm: ['["shop"="car_repair"]'] },
+  { termos: ['mudancas', 'empresas de mudancas'], google: ['moving_company'], osm: ['["office"="moving_company"]'] },
+  { termos: ['limpeza', 'empresas de limpeza', 'limpezas'], google: [], osm: ['["craft"="cleaning"]', '["shop"="cleaning"]', '["office"="cleaning"]'] },
+  /* transportadora != empresa de mudancas: sao atividades distintas */
+  { termos: ['transportadora', 'transportadoras', 'transportes'], google: [], osm: ['["office"="logistics"]'] },
+  { termos: ['construtora', 'construtoras', 'construcao civil', 'empresa de construcao'], google: [], osm: ['["craft"="builder"]', '["office"="construction_company"]'] },
+  { termos: ['software house', 'software houses', 'empresa de software', 'programadores', 'desenvolvimento web'], google: [], osm: ['["office"="it"]'] }
+];
+
+/* Reconhece a atividade pela query. Correspondência exata ou por palavra
+   inteira contida — nunca aproximada, para não trocar de categoria. */
+function reconhecerAtividade(query) {
+  const k = chaveAtividade(query);
+  if (!k) return null;
+  for (const a of ATIVIDADES) if (a.termos.includes(k)) return a;
+  /* long tail: "fotógrafos de casamento" reconhece "fotografos" */
+  for (const a of ATIVIDADES) {
+    for (const t of a.termos) {
+      if (t.includes(' ')) continue;
+      if (new RegExp('(^|\\s)' + escapeRegExp(t) + '(\\s|$)').test(k)) return a;
+    }
+  }
+  return null;
+}
+
 /* Termos por nicho — extensível; usados na Text Search da Google */
 const CATEGORY_EXPANSIONS = {
   imobiliario: ['imobiliária', 'agência imobiliária', 'mediação imobiliária', 'consultor imobiliário', 'compra e venda de imóveis', 'real estate'],
@@ -1835,12 +1944,30 @@ function pontoADistancia(lat, lon, km, brng) {
 function aneisGeograficos(lat, lon, radiusKm) {
   const pts = [{ lat, lon, anel: 0 }];
   if (radiusKm <= 6) return pts;
-  const nAneis = radiusKm <= 12 ? 1 : radiusKm <= 32 ? 2 : 3;
+  /* Até 60 km mantém-se a geometria original (comportamento já validado) */
+  if (radiusKm <= 60) {
+    const nAneis = radiusKm <= 12 ? 1 : radiusKm <= 32 ? 2 : 3;
+    for (let a = 1; a <= nAneis; a++) {
+      const r = radiusKm * (a / (nAneis + 0.4));
+      for (let i = 0; i < 6; i++) {
+        const ang = (2 * Math.PI * i) / 6 + (a % 2 ? 0 : Math.PI / 6);
+        const p = pontoADistancia(lat, lon, r, ang);
+        pts.push({ lat: p.lat, lon: p.lon, anel: a });
+      }
+    }
+    return pts;
+  }
+  /* Raios grandes: a Google só aceita 50 km por consulta, por isso a área é
+     coberta por círculos de 50 km em rede hexagonal — anéis de 75 em 75 km,
+     com pontos suficientes em cada anel para não deixar buracos. */
+  const rConsulta = 50, passo = rConsulta * 1.5;
+  const nAneis = Math.max(1, Math.ceil((radiusKm - rConsulta) / passo));
   for (let a = 1; a <= nAneis; a++) {
-    const r = radiusKm * (a / (nAneis + 0.4));
-    for (let i = 0; i < 6; i++) {
-      const ang = (2 * Math.PI * i) / 6 + (a % 2 ? 0 : Math.PI / 6);
-      const p = pontoADistancia(lat, lon, r, ang);
+    const d = Math.min(a * passo, radiusKm);
+    const n = Math.max(6, Math.ceil(2 * Math.PI * d / passo));
+    for (let i = 0; i < n; i++) {
+      const ang = (2 * Math.PI * i) / n + (a % 2 ? 0 : Math.PI / n);
+      const p = pontoADistancia(lat, lon, d, ang);
       pts.push({ lat: p.lat, lon: p.lon, anel: a });
     }
   }
@@ -2084,7 +2211,8 @@ function planearConsultas({ lat, lon, radiusKm, nicheKeys, keyword }) {
   const nichos = (nicheKeys || []).filter(k => GOOGLE_NICHE_QUERY[k]);
   const pontos = aneisGeograficos(lat, lon, radiusKm);
   const nAneis = Math.max(...pontos.map(p => p.anel));
-  const subRaioM = Math.max(2000, Math.round(radiusKm * 1000 / (nAneis + 1)));
+  /* nunca acima do teto por consulta da API (50 km) */
+  const subRaioM = Math.min(50000, Math.max(2000, Math.round(radiusKm * 1000 / (nAneis + 1))));
   const raioM = Math.min(Math.round(radiusKm * 1000), 50000);
   const centro = pontos[0];
   const plano = [];
@@ -2095,9 +2223,22 @@ function planearConsultas({ lat, lon, radiusKm, nicheKeys, keyword }) {
       plano.push({ fonte: 'google', tipoConsulta: 'nearby', nicho: k, googleType: t, lat: centro.lat, lon: centro.lon, radiusM: raioM });
     }
   }
-  /* 2. Palavra-chave do utilizador — Text com contexto geográfico */
+  /* 2. A query do utilizador é o mecanismo principal: Text Search com o
+        texto exato + contexto geográfico, e ainda Nearby pelos tipos
+        oficiais da Google quando a atividade é reconhecida (otimização). */
   if (keyword) {
     plano.push({ fonte: 'google', tipoConsulta: 'text', nicho: nichos[0] || null, termo: keyword, lat: centro.lat, lon: centro.lon, radiusM: raioM });
+    const atv = reconhecerAtividade(keyword);
+    if (atv) for (const t of atv.google) {
+      plano.push({ fonte: 'google', tipoConsulta: 'nearby', nicho: nichos[0] || null, googleType: t, lat: centro.lat, lon: centro.lon, radiusM: raioM });
+    }
+    /* expansão geográfica da própria query, nos pontos dos anéis */
+    for (const p of pontos.filter(x => x.anel > 0)) {
+      plano.push({ fonte: 'google', tipoConsulta: 'text', nicho: nichos[0] || null, termo: keyword, lat: p.lat, lon: p.lon, radiusM: subRaioM });
+      if (atv) for (const t of atv.google) {
+        plano.push({ fonte: 'google', tipoConsulta: 'nearby', nicho: nichos[0] || null, googleType: t, lat: p.lat, lon: p.lon, radiusM: subRaioM });
+      }
+    }
   }
   /* 3. Sinónimos mais relevantes (2 primeiros por nicho), no centro */
   for (let i = 0; i < 2; i++) {
@@ -2228,7 +2369,9 @@ const SearchEngine = {
      --------------------------------------------------------------------- */
   async runNacional({ nicheKeys, keyword, onStatus, onBatch, onZona, contarUnicos, geracao, cancelado }) {
     const nichos = (nicheKeys || []).filter(k => GOOGLE_NICHE_QUERY[k]);
-    const tipos = nichos.reduce((n, k) => n + GOOGLE_NICHE_QUERY[k].types.length, 0) || 1;
+    const atvNacional = keyword ? reconhecerAtividade(keyword) : null;
+    const tipos = (nichos.reduce((n, k) => n + GOOGLE_NICHE_QUERY[k].types.length, 0)
+      || ((keyword ? 1 : 0) + (atvNacional ? atvNacional.google.length : 0))) || 1;
     const teto = SEARCH_BUDGET.maxRequestsNacional;
 
     /* grelha adaptada ao orçamento: alarga o espaçamento até caber */
@@ -2272,10 +2415,14 @@ const SearchEngine = {
         for (const k of nichos) {
           for (const t of GOOGLE_NICHE_QUERY[k].types) consultas.push({ zona: z, nicho: k, googleType: t });
         }
-        if (!nichos.length && keyword) consultas.push({ zona: z, nicho: null, termo: keyword });
+        if (!nichos.length && keyword) {
+          consultas.push({ zona: z, nicho: null, termo: keyword });
+          const atv = reconhecerAtividade(keyword);
+          if (atv) for (const t of atv.google) consultas.push({ zona: z, nicho: null, googleType: t });
+        }
       }
       const resultados = await Promise.all(consultas.map(async c => {
-        const chave = chaveCache(c.nicho || c.termo, c.zona.id, keyword);
+        const chave = chaveCache(c.nicho || c.googleType || c.termo, c.zona.id, chaveAtividade(keyword));
         const emCache = lerCacheNacional(chave);
         if (emCache) return { ok: true, leads: emCache, cache: true };
         estado.pedidos++;
@@ -2312,7 +2459,12 @@ function setStatus(text) { $('#searchStatus').textContent = text; }
 /* Registos brutos → leads limpos, dentro do raio, sem duplicados e ordenados.
    Usado tanto nos lotes progressivos como na consolidação final. */
 function consolidar(rawLeads, center, dateStr, radiusKm, limite) {
-  let cleaned = rawLeads.map(r => cleanLead(r, center, dateStr));
+  const q = state.searchQuery.trim();
+  let cleaned = rawLeads.map(r => {
+    const l = cleanLead(r, center, dateStr);
+    l.searchQueries = q ? [q] : [];   /* que pesquisa trouxe este lead (§18) */
+    return l;
+  });
   cleaned = cleaned.filter(l => l.distanciaKm <= radiusKm + 0.05);   /* nunca fora do raio pedido */
   const { leads, merged } = DataCleaner.dedupe(cleaned);
   leads.sort((a, b) => a.distanciaKm - b.distanciaKm);
@@ -2399,8 +2551,9 @@ async function runSearch(p) {
 
     /* limpar filtros/seleção antes dos primeiros resultados (render progressivo) */
     state.selected.clear();
-    state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '' };
+    state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '', tipo: '' };
     $('#tableFilter').value = '';
+    $('#filtroTipo').value = '';
     $('#togglePhone').checked = false;
     $('#toggleSite').checked = false;
     state.sort = { key: 'distanciaKm', dir: 'asc' };
@@ -2408,7 +2561,10 @@ async function runSearch(p) {
 
     /* 2. Obter empresas (demo, ou motor multi-fonte) */
     let rawLeads, motorEstado = null;
-    const consolidarAqui = raw => consolidar(raw, center, state.searchMeta.dateStr, p.radiusKm);
+    /* raios grandes não podem ser cortados nos 500 mais próximos: isso
+       descartaria justamente as cidades distantes que o utilizador pediu */
+    const tetoLocal = p.radiusKm > CONFIG.raioGrandeKm ? CONFIG.maxResultsLocalGrande : CONFIG.maxResults;
+    const consolidarAqui = raw => consolidar(raw, center, state.searchMeta.dateStr, p.radiusKm, tetoLocal);
     /* no modo Portugal não há raio a limitar: a cobertura é territorial */
     const consolidarNacional = raw => consolidar(raw, center, state.searchMeta.dateStr, Infinity, CONFIG.maxResultsNacional);
     if (p.demo || IS_FILE) {
@@ -2531,9 +2687,18 @@ function defaultDemoParams() {
 }
 
 /* ---------- 10. Renderização ---------- */
+/* Rótulo de um balde. Na pesquisa universal a etiqueta "Personalizado" não diz
+   nada ao utilizador: mostra-se antes a atividade que trouxe o resultado. */
+function nichoLabelBalde(k) {
+  if (k === 'personalizado' && state.searchQuery) return state.searchQuery;
+  return (NICHES[k] || NICHES.personalizado).label;
+}
+function nichoLabel(l) {
+  if (l.nicho === 'personalizado' && l.searchQueries && l.searchQueries.length) return l.searchQueries[0];
+  return (NICHES[l.nicho] || NICHES.personalizado).label;
+}
 function nicheBadge(l) {
-  const n = NICHES[l.nicho] || NICHES.personalizado;
-  return '<span class="badge b-' + l.nicho + '"><span class="b-dot"></span>' + esc(n.label) + '</span>';
+  return '<span class="badge b-' + l.nicho + '"><span class="b-dot"></span>' + esc(nichoLabel(l)) + '</span>';
 }
 function joinAddr(l) {
   return [l.morada, l.codigoPostal, l.localidade].filter(v => v !== ND).join(' · ') || ND;
@@ -2597,6 +2762,7 @@ function computeFiltered() {
     if (f.siteOnly && l.website === ND) return false;
     if (f.distrito && l.distrito !== f.distrito) return false;
     if (f.concelho && l.concelho !== f.concelho) return false;
+    if (f.tipo && (l.leadType || 'UNKNOWN') !== f.tipo) return false;
     if (txt) {
       const hay = normalizeStr([l.nome, l.segmento, l.morada, l.localidade, l.codigoPostal].join(' '));
       if (!hay.includes(txt)) return false;
@@ -2710,17 +2876,20 @@ function renderFiltrosTerritoriais() {
 function renderChips() {
   const counts = {};
   for (const l of state.leads) counts[l.nicho] = (counts[l.nicho] || 0) + 1;
-  const keys = [...MAIN_NICHES, 'personalizado'].filter(k => k !== 'personalizado' || counts.personalizado);
+  /* Só baldes com resultados: na pesquisa universal, chips a zero são ruído */
+  const keys = [...MAIN_NICHES, 'personalizado'].filter(k => counts[k] > 0);
   const chips = keys.map(k => {
-    const n = NICHES[k];
-    const count = counts[k] || 0;
+    const count = counts[k];
     const active = state.filters.niches.has(k);
+    const cor = k.slice(0, 3);
     return '<button type="button" class="chip" data-niche="' + k + '" aria-pressed="' + active + '"' +
-      (count ? '' : ' disabled') +
-      ' style="--chip-c:var(--n-' + k.slice(0, 3) + ');--chip-t:var(--n-' + k.slice(0, 3) + '-t);--chip-bg:var(--n-' + k.slice(0, 3) + '-bg)">' +
-      '<span class="chip-dot" style="background:var(--n-' + k.slice(0, 3) + ')"></span>' + esc(n.label) +
+      ' style="--chip-c:var(--n-' + cor + ');--chip-t:var(--n-' + cor + '-t);--chip-bg:var(--n-' + cor + '-bg)">' +
+      '<span class="chip-dot" style="background:var(--n-' + cor + ')"></span>' + esc(nichoLabelBalde(k)) +
       '<span class="chip-n">' + count + '</span></button>';
   });
+  /* Com um único balde não há nada para filtrar aqui */
+  $('#chipRow').hidden = keys.length < 2;
+  if (keys.length < 2) { $('#chipRow').innerHTML = ''; return; }
   chips.push('<button type="button" class="chip chip-reset" id="chipReset">Todos</button>');
   $('#chipRow').innerHTML = chips.join('');
 }
@@ -2728,13 +2897,14 @@ function renderChips() {
 function countTo(el, target) {
   const start = Number(el.dataset.v || 0);
   /* document.hidden: rAF não corre em tabs em background — fixar o valor final */
-  if (reduceMotion || document.hidden || start === target) { el.textContent = String(target); el.dataset.v = target; return; }
+  const fmt = v => Number(v).toLocaleString('pt-PT');
+  if (reduceMotion || document.hidden || start === target) { el.textContent = fmt(target); el.dataset.v = target; return; }
   const t0 = performance.now(), dur = 380;
   function step(t) {
     const p = Math.min(1, (t - t0) / dur);
     const eased = 1 - Math.pow(1 - p, 3);
-    el.textContent = String(Math.round(start + (target - start) * eased));
-    if (p < 1) requestAnimationFrame(step); else el.dataset.v = target;
+    el.textContent = fmt(Math.round(start + (target - start) * eased));
+    if (p < 1) requestAnimationFrame(step); else { el.textContent = fmt(target); el.dataset.v = target; }
   }
   requestAnimationFrame(step);
 }
@@ -2745,16 +2915,16 @@ function renderKPIs() {
   const nSite = L.filter(l => l.website !== ND).length;
   const nMob = L.filter(l => l.telemovel !== ND).length;
   const nSoc = L.filter(l => l.instagram !== ND || l.facebook !== ND || l.linkedin !== ND).length;
-  const nNich = new Set(L.map(l => l.nicho)).size;
+  const nEmail = L.filter(l => l.emails && l.emails.length).length;
   countTo($('#kpiFound .kpi-v'), total);
   countTo($('#kpiSel .kpi-v'), state.selected.size);
-  countTo($('#kpiNiches .kpi-v'), nNich);
+  countTo($('#kpiEmail .kpi-v'), nEmail);
   countTo($('#kpiSite .kpi-v'), nSite);
   countTo($('#kpiMobile .kpi-v'), nMob);
   countTo($('#kpiSocial .kpi-v'), nSoc);
   $('#kpiFoundM').textContent = state.hasSearched ? ('raio ' + state.radiusKm + ' km') : '';
   $('#kpiSelM').textContent = state.selected.size ? 'prontos a exportar' : '';
-  $('#kpiNichesM').textContent = '';
+  $('#kpiEmailM').textContent = pct(nEmail, total);
   $('#kpiSiteM').textContent = pct(nSite, total);
   $('#kpiMobileM').textContent = pct(nMob, total);
   $('#kpiSocialM').textContent = pct(nSoc, total);
@@ -2777,7 +2947,22 @@ function updateCheckAll() {
 
 function updateResultCount() {
   const t = state.leads.length, f = state.filtered.length;
-  $('#resultsCount').textContent = f === t ? String(t) : f + ' de ' + t;
+  const nf = v => Number(v).toLocaleString('pt-PT');
+  $('#resultsCount').textContent = f === t ? nf(t) : nf(f) + ' de ' + nf(t);
+  atualizarAmbito();
+}
+
+/* Cabeçalho: o que foi pesquisado e onde — ex.: eletricistas · Caneças · raio 100 km */
+function atualizarAmbito() {
+  const el = $('#resultsScope');
+  const q = state.searchQuery.trim();
+  if (!state.hasSearched || !q) { el.hidden = true; el.textContent = ''; return; }
+  const onde = state.modo === 'portugal'
+    ? 'Portugal continental'
+    : [state.centerMeta.morada || state.center.label, 'raio ' + state.radiusKm + ' km'].filter(Boolean).join(' \u00b7 ');
+  el.textContent = q + ' \u00b7 ' + onde;
+  el.title = el.textContent;
+  el.hidden = false;
 }
 
 function toggleEmptyState() {
@@ -2788,7 +2973,7 @@ function toggleEmptyState() {
   if (show) {
     if (state.hasSearched) {
       $('#emptyTitle').textContent = 'Sem resultados nesta área';
-      $('#emptyText').textContent = 'Experimente aumentar o raio, escolher mais nichos ou usar outra palavra-chave. As fontes públicas nem sempre cobrem todas as empresas.';
+      $('#emptyText').textContent = 'Experimente aumentar o raio ou descrever a atividade de outra forma (ex.: “canalizadores” em vez de “picheleiros”). As fontes públicas nem sempre cobrem todos os negócios.';
     } else {
       $('#emptyTitle').textContent = 'Defina o território e comece a prospeção';
       $('#emptyText').textContent = 'Escolha localização, raio e nicho em "Nova Pesquisa", ou carregue o conjunto de demonstração para explorar a ferramenta.';
@@ -2805,7 +2990,11 @@ function updateLocPill() {
 }
 
 function renderMapLegend() {
-  const items = MAIN_NICHES.map(k =>
+  const presentes = new Set(state.leads.map(l => l.nicho));
+  const base = state.hasSearched && presentes.size
+    ? [...MAIN_NICHES, 'personalizado'].filter(k => presentes.has(k))
+    : MAIN_NICHES;
+  const items = base.map(k =>
     '<span class="legend-item"><span class="legend-dot" style="background:' + NICHES[k].color + '"></span>' + esc(NICHES[k].label) + '</span>');
   items.push('<span class="legend-item"><span class="legend-center"></span>Centro e raio de pesquisa</span>');
   $('#mapLegend').innerHTML = items.join('');
@@ -2818,6 +3007,7 @@ function renderAll(opts) {
   renderTable(opts);
   MapP().renderLeads(state.filtered);
   renderKPIs();
+  renderMapLegend();
   renderSelectionBar();
   updateResultCount();
   toggleEmptyState();
@@ -2827,7 +3017,7 @@ function renderAll(opts) {
 function leadsToRows(list) {
   return list.map(l => ({
     'Empresa': l.nome,
-    'Nicho': (NICHES[l.nicho] || NICHES.personalizado).label,
+    'Nicho': nichoLabel(l),
     'Segmento': l.segmento,
     'Morada': l.morada,
     'Código Postal': l.codigoPostal,
@@ -2845,12 +3035,13 @@ function leadsToRows(list) {
     'Longitude': l.lon,
     'Distância (km)': l.distanciaKm,
     'Fonte': fonteLabel(l),
+    'Pesquisa': (l.searchQueries && l.searchQueries.length) ? l.searchQueries.join('; ') : ND,
     'Data da Pesquisa': l.dataPesquisa
   }));
 }
 function buildWorkbook(list) {
   const ws = XLSX.utils.json_to_sheet(leadsToRows(list));
-  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 16 }, { wch: 18 }, { wch: 17 }, { wch: 17 }, { wch: 34 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 17 }];
+  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 16 }, { wch: 18 }, { wch: 17 }, { wch: 17 }, { wch: 34 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 24 }, { wch: 17 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leads');
   return wb;
@@ -3053,13 +3244,17 @@ function openSearchModal() {
   $$('#raioPills input').forEach(r => { r.checked = false; });
   if (preset) { preset.checked = true; $('#raioCustomWrap').hidden = true; }
   else { $('#rCustom').checked = true; $('#raioCustomWrap').hidden = false; $('#fRaioCustom').value = state.radiusKm; }
-  const chosen = state.searchMeta.nicheKeys.length ? state.searchMeta.nicheKeys : MAIN_NICHES;
-  $$('#nicheChecks input').forEach(c => { c.checked = chosen.includes(c.value); });
-  $('#keywordWrap').hidden = !$('#nPersonalizado').checked;
-  $('#fKeyword').value = state.searchMeta.keyword || '';
-  ['fMorada', 'fCP', 'fCidade', 'fRaioCustom', 'fKeyword'].forEach(id => setFieldState(document.getElementById(id), '', { neutral: true }));
-  $('#err-nichos').hidden = true;
+  $('#fQuery').value = state.searchQuery;
+  marcarSugestao($('#fQuery').value);
+  ['fQuery', 'fMorada', 'fCP', 'fCidade', 'fRaioCustom'].forEach(id => setFieldState(document.getElementById(id), '', { neutral: true }));
   openModal($('#searchModal'));
+  requestAnimationFrame(() => { if (!$('#fQuery').value) $('#fQuery').focus(); });
+}
+
+/* Realça a sugestão correspondente ao que está escrito (só indicação visual) */
+function marcarSugestao(valor) {
+  const k = chaveAtividade(valor);
+  $$('#sugestoes button').forEach(b => b.setAttribute('aria-pressed', String(chaveAtividade(b.dataset.q) === k)));
 }
 
 function getRadiusValue() {
@@ -3076,8 +3271,9 @@ function onSearchSubmit(e) {
   const cp = $('#fCP').value.trim();
   const cidade = $('#fCidade').value.trim();
   const radiusKm = getRadiusValue();
-  const nicheKeys = $$('#nicheChecks input:checked').map(c => c.value);
-  const keyword = nicheKeys.includes('personalizado') ? $('#fKeyword').value.trim() : '';
+  /* A query escrita é o único motor da pesquisa: não há nichos obrigatórios. */
+  const keyword = $('#fQuery').value.trim();
+  const nicheKeys = [];
   const m = state.centerMeta;
   const changedLoc = morada !== (m.morada || '') || cp !== (m.cp || '') || cidade !== (m.cidade || '');
   closeModal($('#searchModal'));
@@ -3124,22 +3320,24 @@ function bindEvents() {
   $('#searchForm').addEventListener('submit', onSearchSubmit);
   $$('#searchModal [data-close]').forEach(b => b.addEventListener('click', () => closeModal($('#searchModal'))));
   $('#searchModal').addEventListener('mousedown', e => { if (e.target === e.currentTarget) closeModal($('#searchModal')); });
-  ['fMorada', 'fCP', 'fCidade', 'fRaioCustom', 'fKeyword'].forEach(id => {
+  ['fQuery', 'fMorada', 'fCP', 'fCidade', 'fRaioCustom'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('blur', () => Validator.validateField(id));
     el.addEventListener('input', () => { if (el.classList.contains('invalid')) Validator.validateField(id); });
   });
+  /* Sugestões rápidas: preenchem o campo, não substituem a escrita livre */
+  $('#fQuery').addEventListener('input', e => marcarSugestao(e.target.value));
+  $$('#sugestoes button').forEach(b => b.addEventListener('click', () => {
+    const campo = $('#fQuery');
+    campo.value = b.dataset.q;
+    marcarSugestao(campo.value);
+    setFieldState(campo, '');
+    campo.focus();
+  }));
   $$('#raioPills input').forEach(r => r.addEventListener('change', () => {
     $('#raioCustomWrap').hidden = !$('#rCustom').checked;
     if ($('#rCustom').checked) $('#fRaioCustom').focus();
     else setFieldState($('#fRaioCustom'), '', { neutral: true });
-  }));
-  $$('#nicheChecks input').forEach(c => c.addEventListener('change', () => {
-    Validator.validateNiches();
-    const per = $('#nPersonalizado').checked;
-    $('#keywordWrap').hidden = !per;
-    if (per) $('#fKeyword').focus();
-    else setFieldState($('#fKeyword'), '', { neutral: true });
   }));
 
   /* Modal de confirmação */
@@ -3196,6 +3394,10 @@ function bindEvents() {
   });
   $('#filtroConcelho').addEventListener('change', e => {
     state.filters.concelho = e.target.value;
+    renderAll();
+  });
+  $('#filtroTipo').addEventListener('change', e => {
+    state.filters.tipo = e.target.value;
     renderAll();
   });
 
@@ -3569,6 +3771,7 @@ function applyEmails(id, registo) {
   if (!lead) return;
   lead.emails = registo.emails;
   updateLeadEmailUI(id);
+  renderKPIs();   /* o KPI "Com email" acompanha o enriquecimento, como o social */
 }
 
 /* Enriquecimento de email de um lead */

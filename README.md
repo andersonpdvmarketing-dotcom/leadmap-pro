@@ -1,6 +1,6 @@
 # LeadMap Pro — Mapa Inteligente de Leads B2B
 
-Ferramenta de prospeção comercial B2B para Portugal: define uma **localização + raio + nicho**, recebe **leads empresariais com contactos públicos**, visualiza-os no **mapa** e exporta para **Excel (.xlsx)**.
+Ferramenta de prospeção comercial B2B para Portugal: escreve **qualquer atividade, profissão ou segmento** e define **localização + raio** (ou Portugal inteiro), recebe **leads com contactos públicos**, visualiza-os no **mapa** e exporta para **Excel (.xlsx)**.
 
 - **Ficheiro único**: `index.html` auto-contido (CSS + JS embutidos; Leaflet e SheetJS via CDN).
 - **Sem API keys no frontend** — funciona logo à partida com fontes gratuitas (OpenStreetMap).
@@ -55,14 +55,12 @@ Não há build, variáveis nem configuração — só o upload.
 
 ## 3. Como usar
 
-1. **+ Nova Pesquisa** → morada/código postal/cidade, raio (5–50 km ou personalizado 1–100) e nichos:
-   - **Imobiliário** (mediação, consultores, gestão)
-   - **Saúde / Odontologia** (clínicas dentárias, implantologia, ortodontia)
-   - **Estética** (clínicas de estética, medicina estética, spa, laser)
-   - **Automóvel** (stands, concessionários, seminovos)
-   - **Personalizado** — qualquer palavra-chave (mín. 3 caracteres)
+1. **+ Nova Pesquisa** → **O que pretende pesquisar?** (texto livre: `eletricistas`, `advogados de imigração`, `empresas de limpeza industrial`, `instaladores de painéis solares`…), depois morada/código postal/cidade e raio (5–50 km ou personalizado a partir de 1 km).
+   - Não há lista fechada de atividades: a query escrita é o motor da pesquisa.
+   - As **sugestões rápidas** por baixo do campo preenchem-no com um clique — são atalhos, não categorias obrigatórias.
+   - Quando a atividade é reconhecida (eletricista, advogado, dentista…), o sistema acrescenta automaticamente os tipos oficiais da Google e as tags reais do OpenStreetMap. Quando não é, a pesquisa corre na mesma por texto e por nome.
 2. A **pesquisa rápida** na barra superior pesquisa por palavra-chave dentro do território atual (mín. 2 caracteres).
-3. Resultados na **tabela** (ordenar por colunas, filtrar por texto/nicho/telefone/website) e no **mapa** (marcadores coloridos por nicho; popup com contactos + "Abrir no Google Maps" + "Ver no Google Earth").
+3. Resultados na **tabela** (ordenar por colunas, filtrar por texto/tipo/distrito/concelho/telefone/website) e no **mapa** (marcadores coloridos por nicho; popup com contactos + "Abrir no Google Maps" + "Ver no Google Earth").
 4. Selecionar leads → **Exportar seleção**; sem seleção, o botão **Exportar para Excel** pergunta se quer todos os filtrados.
 5. O **histórico** (últimas 20 pesquisas) fica em `localStorage` e permite repetir com um clique.
 
@@ -105,8 +103,8 @@ Em tempo real (blur + input) e no submit, com mensagens em português, `aria-inv
 - **Morada/Localidade**: obrigatória, mín. 3 caracteres
 - **Código Postal**: vazio ou `0000-000`
 - **Cidade**: vazia ou mín. 2 caracteres
-- **Raio**: presets 5/10/20/30/50 ou personalizado 1–100 km
-- **Nichos**: pelo menos um; **Personalizado** obriga a palavra-chave (mín. 3)
+- **Raio**: presets 5/10/20/30/50 ou personalizado a partir de 1 km (sem limite superior)
+- **O que pretende pesquisar**: obrigatório; qualquer texto não vazio é aceite
 - **Pesquisa rápida**: mín. 2 caracteres
 
 A geocodificação só corre se a localização tiver sido alterada (senão reutiliza as coordenadas atuais).

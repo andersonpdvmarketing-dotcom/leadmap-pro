@@ -30,7 +30,8 @@ Consola de prospeção territorial: **o chrome é tinta monocromática; só os d
 - **Botões**: primário = tinta sólida; secundário = superfície + hairline forte; ghost sem borda. Altura 36/30 (sm), radius 8, transições 150ms.
 - **KPI strip**: grelha única com divisórias de 1px (gap 1px sobre fundo `--border`) — nunca 6 cartões soltos.
 - **Badges de nicho**: pill com ponto colorido + tint de fundo + texto da variante `-t`.
-- **Chips de filtro**: pill 28px; ativo herda as cores do nicho via `--chip-*`.
+- **Chips de filtro**: pill 28px; ativo herda as cores do nicho via `--chip-*`. Escondem-se quando os resultados têm um único balde — não há nada para filtrar.
+- **Campo de pesquisa universal** (`.query-grande`) + **sugestões rápidas** (`.sugestoes`): o campo de texto livre é o primeiro elemento do modal e a entrada principal da app; as sugestões são pills 30px monocromáticas que só preenchem o campo (`aria-pressed` marca a correspondência). Nunca são categorias obrigatórias.
 - **Tabela**: thead sticky, hover em `--surface-2`, selecionado com 5% de tinta; `N/D` sempre em `--faint`; entrada de linhas com stagger (cap 24 × 14ms).
 - **Modais**: backdrop blur 3px, radius 14; validação = borda/ tint `--danger` + mensagem com ícone alert + `aria-invalid`/`role="alert"`; válido = borda esverdeada.
 - **Toasts**: canto inferior direito, ícone semântico, slide-in 220ms.
