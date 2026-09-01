@@ -10,6 +10,8 @@ node_modules/
 .impeccable/
 .vercel
 .env*
+# .env.example não tem segredos: é o modelo das variáveis do backend
+!.env.example
 
 # Ferramenta local de deploy (Vercel CLI) — não é dependência da aplicação
 package.json
