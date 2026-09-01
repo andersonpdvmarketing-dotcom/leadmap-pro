@@ -15,6 +15,17 @@
  * regras — sessão, papéis, segredo do worker, validação, formato dos
  * erros — vivem em `providers/outreach/routes.mjs` e `http.mjs`, os
  * mesmos módulos de antes.
+ *
+ * PORQUE É `.mjs` E NÃO `.js`
+ * --------------------------
+ * `package.json` está no .gitignore, por isso o deployment não declara
+ * `"type": "module"`. Sem essa declaração um `.js` é CommonJS, o
+ * `import` é transpilado para `require()`, e `require()` de um `.mjs`
+ * falha em runtime — a função responde 500 FUNCTION_INVOCATION_FAILED
+ * com o build a passar na mesma. As outras funções do projeto escapam
+ * porque não importam nada. Esta é a primeira que importa, e a extensão
+ * `.mjs` torna-a ESM sem depender de configuração nenhuma.
+ * NÃO renomear para `.js`.
  */
 import { despachar } from '../../providers/outreach/routes.mjs';
 

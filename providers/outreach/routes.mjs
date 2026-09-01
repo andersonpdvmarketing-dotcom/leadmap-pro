@@ -5,7 +5,7 @@
  * ali é uma Serverless Function, e oito delas estouraram o teto do plano
  * — o build falhava por inteiro, sem chegar sequer a servir os ficheiros
  * estáticos. Os handlers passaram para aqui **sem alteração de lógica**;
- * `api/outreach/[...rota].js` é o único ficheiro em `api/` e limita-se a
+ * `api/outreach/[...rota].mjs` é o único ficheiro em `api/` e limita-se a
  * escolher qual chamar.
  *
  * A autenticação, a autorização, o repositório e o formato dos erros

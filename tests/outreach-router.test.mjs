@@ -4,7 +4,7 @@
  *   node --test
  *
  * Os oito endpoints passaram a ser servidos por uma única Serverless
- * Function (`api/outreach/[...rota].js`). Consolidar rotas é
+ * Function (`api/outreach/[...rota].mjs`). Consolidar rotas é
  * exatamente o tipo de mudança que perde uma proteção sem ninguém dar
  * por isso, por isso estes testes verificam, endpoint a endpoint:
  * método certo, método errado, rota desconhecida, sessão, papel de
