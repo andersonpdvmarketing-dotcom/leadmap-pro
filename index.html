@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LeadMap Pro — Mapa Inteligente de Leads B2B</title>
-<meta name="description" content="LeadMap Pro — prospeção comercial B2B em Portugal: defina território, raio e nicho; visualize leads no mapa e exporte para Excel.">
+<meta name="description" content="LeadMap Pro — prospeção comercial B2B em Portugal: defina território, raio e a atividade que procura; visualize leads no mapa e exporte para Excel.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23191d26' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='6.5'/%3E%3Ccircle cx='12' cy='12' r='1.6' fill='%23191d26' stroke='none'/%3E%3Cpath d='M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3'/%3E%3C/svg%3E">
 <script>
 /* Arranque do tema antes do CSS para evitar flash (claro/escuro persistente). */
@@ -205,7 +205,7 @@ a:hover { color: var(--ink-hover); }
 
 /* ---------- KPIs ---------- */
 .kpis {
-  display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
   background: var(--border); border: 1px solid var(--border);
   border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm);
 }
@@ -494,6 +494,13 @@ table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-wid
 .span2 { grid-column: 1 / -1; }
 .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
 .field input[type="text"], .field input[type="number"] { width: 100%; }
+.field textarea {
+  width: 100%; min-height: 96px; resize: vertical; padding: 9px 11px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: 400 13.5px/1.55 var(--font); transition: border-color .15s ease, box-shadow .15s ease;
+}
+.field textarea:focus-visible { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 14%, transparent); }
+.field textarea.invalid { border-color: var(--danger); }
 .radio-pills { display: flex; gap: 7px; flex-wrap: wrap; }
 .radio-pills input { position: absolute; opacity: 0; pointer-events: none; }
 .radio-pills label {
@@ -515,6 +522,155 @@ table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-wid
 .niche-check .n-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--b-c); flex: none; }
 .niche-check .n-name { font-size: 13px; font-weight: 600; color: var(--text); }
 .niche-check:has(input:checked) { background: var(--b-bg); border-color: color-mix(in srgb, var(--b-c) 40%, var(--border)); }
+/* ---------- OUTREACH (Fase B — simulação) ---------- */
+.viewnav { display: inline-flex; gap: 2px; padding: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; }
+.viewnav button {
+  height: 28px; padding: 0 12px; border: 0; border-radius: 7px; cursor: pointer;
+  background: transparent; color: var(--text-2); font: 600 12.5px/1 var(--font);
+  transition: background .15s ease, color .15s ease;
+}
+.viewnav button:hover { color: var(--text); }
+.viewnav button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+
+.sim-banner {
+  display: flex; align-items: center; gap: 9px; padding: 10px 14px; margin-bottom: 16px;
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+  border-radius: 10px; font-size: 12.5px; color: var(--text);
+}
+.sim-banner b { font-weight: 700; }
+.sim-banner .ic { color: var(--warn); flex: none; }
+
+.o-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.o-tabs button {
+  height: 34px; padding: 0 13px; border: 0; background: transparent; cursor: pointer;
+  font: 600 13px/1 var(--font); color: var(--muted); border-bottom: 2px solid transparent;
+  margin-bottom: -1px; transition: color .15s ease, border-color .15s ease;
+}
+.o-tabs button:hover { color: var(--text-2); }
+.o-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--ink); }
+.o-tabs .o-tab-n { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
+
+.o-panel { display: none; }
+.o-panel.on { display: block; }
+.o-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.o-head h2 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.o-head .o-spacer { flex: 1; }
+
+.o-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-sm); }
+.o-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.o-acct { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.o-acct-top { display: flex; align-items: center; gap: 10px; }
+.o-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: var(--surface-3); color: var(--text-2); font: 700 14px/1 var(--font);
+}
+.o-acct-id { min-width: 0; }
+.o-acct-id b { display: block; font-size: 13.5px; font-weight: 700; }
+.o-acct-id span { display: block; font-size: 12px; color: var(--muted); }
+.o-caps { display: flex; flex-wrap: wrap; gap: 5px; }
+.o-cap {
+  display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px;
+  border-radius: 999px; font: 600 10.5px/1 var(--font); border: 1px solid var(--border);
+  color: var(--muted); background: var(--surface-2);
+}
+.o-cap.yes { color: var(--ok); background: var(--ok-bg); border-color: color-mix(in srgb, var(--ok) 30%, var(--border)); }
+
+.o-status { display: inline-flex; align-items: center; gap: 5px; height: 21px; padding: 0 8px; border-radius: 999px; font: 600 11px/1 var(--font); }
+.o-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.s-CONNECTED, .s-SENT, .s-COMPLETED, .s-ELIGIBLE { color: var(--ok); background: var(--ok-bg); }
+.s-UNKNOWN, .s-DRAFT, .s-PENDING, .s-PAUSED { color: var(--text-2); background: var(--surface-3); }
+.s-READY, .s-RUNNING, .s-PROCESSING, .s-REPLIED { color: var(--info); background: var(--info-bg); }
+.s-FAILED, .s-NOT_ELIGIBLE, .s-ERROR, .s-CANCELLED { color: var(--danger); background: var(--danger-bg); }
+.s-OPTED_OUT, .s-SKIPPED, .s-RATE_LIMITED, .s-TOKEN_EXPIRED, .s-RESTRICTED { color: var(--warn); background: var(--warn-bg); }
+
+.o-table-wrap { overflow-x: auto; }
+table.o-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+table.o-table th {
+  position: sticky; top: 0; z-index: 2; background: var(--surface-2); text-align: left;
+  font: 700 11px/1 var(--font); letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+  padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+table.o-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+table.o-table tbody tr:hover { background: var(--surface-2); }
+table.o-table tbody tr:last-child td { border-bottom: 0; }
+.o-nowrap { white-space: nowrap; }
+.o-dim { color: var(--muted); }
+
+.o-pager { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+.o-pager .o-spacer { flex: 1; }
+
+.o-empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+.o-empty h3 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0 0 6px; }
+.o-empty p { margin: 0 auto 14px; max-width: 46ch; font-size: 13px; line-height: 1.55; }
+
+.o-steps { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.o-step { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.o-step-n {
+  width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface-3); color: var(--text-2); font: 700 11px/1 var(--font);
+}
+.o-step.on { color: var(--text); font-weight: 600; }
+.o-step.on .o-step-n { background: var(--ink); color: var(--on-ink); }
+.o-step.done .o-step-n { background: var(--ok-bg); color: var(--ok); }
+
+.o-preview { display: flex; flex-direction: column; gap: 10px; }
+.o-bubble {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 11px 13px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+}
+.o-bubble.out { background: color-mix(in srgb, var(--ink) 7%, var(--surface)); }
+.o-bubble-who { font-size: 11.5px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.o-warn { font-size: 12px; color: var(--warn); background: var(--warn-bg); border-radius: 8px; padding: 8px 10px; }
+
+.o-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.o-picklist { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+.o-picklist label { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.o-picklist label:last-child { border-bottom: 0; }
+.o-picklist label:hover { background: var(--surface-2); }
+.o-vars { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.o-vars button {
+  height: 24px; padding: 0 9px; border-radius: 6px; cursor: pointer; border: 1px solid var(--border);
+  background: var(--surface-2); font: 600 11.5px/1 ui-monospace, monospace; color: var(--text-2);
+}
+.o-vars button:hover { border-color: var(--border-strong); color: var(--text); }
+
+.o-prov-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--border); }
+.o-prov-row:last-child { border-bottom: 0; }
+.o-prov-row b { font-size: 13px; }
+.o-prov-row .o-spacer { flex: 1; }
+.modal.modal-lg { max-width: 980px; }
+.prev-cab { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+.prev-cab b { color: var(--text); font-weight: 600; }
+.o-dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: baseline; margin: 0; }
+.o-dl dt { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.o-dl dd { margin: 0; font-size: 13px; word-break: break-word; }
+/* ---------- Histórico de listas ---------- */
+.hist-badge { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px;
+  border-radius: 999px; font: 600 11px/1 var(--font); white-space: nowrap; }
+.hist-badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.hist-nova { color: var(--ok); background: var(--ok-bg); }
+.hist-rep { color: var(--warn); background: var(--warn-bg); }
+td.td-hist { white-space: nowrap; }
+.hist-row { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.hist-row:last-child { border-bottom: 0; }
+.hist-main { min-width: 190px; flex: 1; }
+.hist-main b { display: block; font-size: 13.5px; font-weight: 700; }
+.hist-meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.hist-nums { display: flex; gap: 14px; font-size: 12px; }
+.hist-nums span { display: flex; flex-direction: column; gap: 1px; }
+.hist-nums b { font: 700 14px/1 var(--font); font-variant-numeric: tabular-nums; }
+.hist-nums i { font-style: normal; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.hist-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 700px) { .hist-row { gap: 9px } .hist-nums { gap: 10px } .hist-acoes { width: 100% } }
+.selbar.hidden-view { display: none !important; }
+
+@media (max-width: 700px) {
+  .o-tabs { gap: 0; }
+  .o-tabs button { padding: 0 9px; font-size: 12px; }
+  .o-head h2 { font-size: 14px; }
+}
+
 /* Pesquisa universal: campo principal + sugestões rápidas */
 .query-grande { width: 100%; height: 46px; font-size: 15px; font-weight: 500; }
 .sugestoes-t { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 8px; }
@@ -638,6 +794,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <span class="brand-tag">Pro</span>
     <span class="brand-sub">Mapa inteligente de leads B2B · Portugal</span>
   </div>
+  <div class="viewnav" role="tablist" aria-label="Vista">
+    <button type="button" id="navLeads" role="tab" aria-selected="true" aria-controls="leadsView">Leads</button>
+    <button type="button" id="navOutreach" role="tab" aria-selected="false" aria-controls="outreachView">Outreach</button>
+  </div>
   <div class="topbar-spacer"></div>
   <div class="topbar-actions">
     <button class="btn btn-ghost btn-icon" id="themeToggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
@@ -657,10 +817,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <main class="wrap">
   <div id="banners" aria-live="polite"></div>
 
+<div id="leadsView" role="tabpanel" aria-labelledby="navLeads">
+
   <!-- KPIs -->
   <section class="kpis" aria-label="Indicadores">
     <div class="kpi" id="kpiFound"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Leads encontrados</span><span class="kpi-m" id="kpiFoundM"></span></div>
     <div class="kpi kpi-sel" id="kpiSel"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Selecionados</span><span class="kpi-m" id="kpiSelM"></span></div>
+    <div class="kpi" id="kpiNovas"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Novas</span><span class="kpi-m" id="kpiNovasM"></span></div>
+    <div class="kpi" id="kpiRepetidas"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Já capturadas</span><span class="kpi-m" id="kpiRepetidasM"></span></div>
     <div class="kpi" id="kpiEmail"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Com email</span><span class="kpi-m" id="kpiEmailM"></span></div>
     <div class="kpi" id="kpiSite"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Com website</span><span class="kpi-m" id="kpiSiteM"></span></div>
     <div class="kpi" id="kpiMobile"><span class="kpi-v" data-v="0">0</span><span class="kpi-l">Com telemóvel</span><span class="kpi-m" id="kpiMobileM"></span></div>
@@ -719,6 +883,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <span class="results-scope" id="resultsScope" hidden></span>
       <span class="results-count mono" id="resultsCount">0</span>
       <div class="results-spacer"></div>
+      <select class="tsel" id="filtroHistorico" aria-label="Filtrar por histórico">
+        <option value="">Todos</option><option value="NOVA">Novas</option><option value="JA_CAPTURADA">Já capturadas</option>
+      </select>
       <select class="tsel" id="filtroTipo" aria-label="Filtrar por tipo de resultado"><option value="">Todos os tipos</option><option value="BUSINESS">Empresa registada</option><option value="UNKNOWN">Não determinado</option></select>
       <select class="tsel" id="filtroDistrito" aria-label="Filtrar por distrito"><option value="">Todos os distritos</option></select>
       <select class="tsel" id="filtroConcelho" aria-label="Filtrar por concelho"><option value="">Todos os concelhos</option></select>
@@ -729,14 +896,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <input type="text" id="tableFilter" placeholder="Filtrar resultados…" aria-label="Filtrar resultados na tabela" autocomplete="off">
       </div>
     </div>
-    <div class="chips" id="chipRow" aria-label="Filtrar por nicho"></div>
+    <div class="chips" id="chipRow" aria-label="Filtrar por atividade"></div>
     <div class="table-wrap" id="tableWrap">
       <table class="leads" id="leadsTable">
         <thead>
           <tr>
             <th style="width:36px"><input type="checkbox" id="checkAll" aria-label="Selecionar todos os resultados visíveis"></th>
-            <th class="sortable" data-sort="nome" aria-sort="none">Empresa<svg class="ic sort-arrow" aria-hidden="true"><use href="#ic-caret"/></svg></th>
-            <th class="sortable" data-sort="nicho" aria-sort="none">Nicho<svg class="ic sort-arrow" aria-hidden="true"><use href="#ic-caret"/></svg></th>
+            <th class="sortable" data-sort="nome" aria-sort="none">Empresa / Profissional<svg class="ic sort-arrow" aria-hidden="true"><use href="#ic-caret"/></svg></th>
+            <th class="sortable" data-sort="nicho" aria-sort="none">Atividade<svg class="ic sort-arrow" aria-hidden="true"><use href="#ic-caret"/></svg></th>
             <th>Segmento</th>
             <th>Morada</th>
             <th>Código Postal</th>
@@ -748,6 +915,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <th>Redes</th>
             <th class="sortable" data-sort="distanciaKm" aria-sort="ascending">Distância<svg class="ic sort-arrow" aria-hidden="true"><use href="#ic-caret"/></svg></th>
             <th>Fonte</th>
+            <th>Histórico</th>
             <th>Ações</th>
           </tr>
         </thead>
@@ -769,7 +937,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <circle cx="50" cy="62" r="3.5" fill="#ea580c" stroke="none"/>
         </svg>
         <h2 id="emptyTitle">Defina o território e comece a prospeção</h2>
-        <p id="emptyText">Escolha localização, raio e nicho em “Nova Pesquisa”, ou carregue o conjunto de demonstração para explorar a ferramenta.</p>
+        <p id="emptyText">Escolha localização, raio e o que pretende pesquisar em “Nova Pesquisa”.</p>
         <div class="empty-actions">
           <button class="btn btn-primary" id="btnEmptyNew" type="button"><svg class="ic"><use href="#ic-plus"/></svg>Nova Pesquisa</button>
           <button class="btn" id="btnDemoLoad" type="button">Carregar dados de demonstração</button>
@@ -779,26 +947,143 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   </section>
 
   <!-- Histórico -->
-  <section class="history" aria-label="Histórico de pesquisas">
+  <!-- Listas geradas -->
+  <section class="results" id="listasSection" aria-label="Listas geradas" style="margin-top:18px" hidden>
+    <div class="results-head">
+      <span class="results-title">Listas geradas</span>
+      <span class="results-count mono" id="listasCount">0</span>
+      <div class="results-spacer"></div>
+      <span class="o-dim" id="listasAviso" style="font-size:12px"></span>
+      <span class="o-dim" style="font-size:12px">Resultados guardados de cada pesquisa</span>
+      <button class="btn btn-sm" type="button" id="btnLimparRegisto">Limpar histórico de leads</button>
+    </div>
+    <div id="listasBody"></div>
+  </section>
+
+  <section class="history" aria-label="Repetir pesquisas anteriores">
     <div class="history-head">
-      <h2>Histórico de pesquisas</h2>
-      <button class="btn btn-ghost btn-sm btn-danger-text" id="btnClearHistory" type="button">Limpar histórico</button>
+      <h2>Repetir pesquisa</h2>
+      <button class="btn btn-ghost btn-sm btn-danger-text" id="btnClearHistory" type="button">Limpar</button>
     </div>
     <div id="historyList"></div>
   </section>
+</div><!-- /leadsView -->
+
+<div id="outreachView" role="tabpanel" aria-labelledby="navOutreach" hidden>
+  <div class="sim-banner">
+    <svg class="ic"><use href="#ic-info"/></svg>
+    <span><b>Envio por configurar.</b> O Outreach está pronto para organizar contactos, mensagens e campanhas.
+    O envio fica disponível assim que uma conta Instagram for ligada.</span>
+  </div>
+
+  <div class="o-tabs" role="tablist" aria-label="Secções do Outreach">
+    <button type="button" role="tab" data-otab="dashboard" aria-controls="oPanel-dashboard" id="oTabBtn-dashboard" aria-selected="true">Dashboard</button>
+    <button type="button" role="tab" data-otab="contactos" aria-controls="oPanel-contactos" id="oTabBtn-contactos" aria-selected="false">Contactos<span class="o-tab-n" id="nContactos">0</span></button>
+    <button type="button" role="tab" data-otab="campanhas" aria-controls="oPanel-campanhas" id="oTabBtn-campanhas" aria-selected="false">Campanhas<span class="o-tab-n" id="nCampanhas">0</span></button>
+    <button type="button" role="tab" data-otab="templates" aria-controls="oPanel-templates" id="oTabBtn-templates" aria-selected="false">Templates<span class="o-tab-n" id="nTemplates">0</span></button>
+    <button type="button" role="tab" data-otab="contas" aria-controls="oPanel-contas" id="oTabBtn-contas" aria-selected="false">Contas Instagram<span class="o-tab-n" id="nContas">0</span></button>
+    <button type="button" role="tab" data-otab="fila" aria-controls="oPanel-fila" id="oTabBtn-fila" aria-selected="false">Fila<span class="o-tab-n" id="nFila">0</span></button>
+  </div>
+
+  <!-- Dashboard -->
+  <section class="o-panel on" id="oPanel-dashboard" role="tabpanel" aria-labelledby="oTabBtn-dashboard" aria-label="Dashboard do Outreach">
+    <section class="kpis" aria-label="Indicadores do Outreach">
+      <div class="kpi"><span class="kpi-v" id="oKpiContactos">0</span><span class="kpi-l">Contactos</span><span class="kpi-m" id="oKpiContactosM"></span></div>
+      <div class="kpi"><span class="kpi-v" id="oKpiInsta">0</span><span class="kpi-l">Com Instagram</span><span class="kpi-m" id="oKpiInstaM"></span></div>
+      <div class="kpi"><span class="kpi-v" id="oKpiCamp">0</span><span class="kpi-l">Campanhas</span><span class="kpi-m" id="oKpiCampM"></span></div>
+      <div class="kpi"><span class="kpi-v" id="oKpiPend">0</span><span class="kpi-l">Pendentes</span></div>
+      <div class="kpi"><span class="kpi-v" id="oKpiEnv">0</span><span class="kpi-l">Enviados</span><span class="kpi-m" id="oKpiEnvM"></span></div>
+      <div class="kpi"><span class="kpi-v" id="oKpiResp">0</span><span class="kpi-l">Respostas</span><span class="kpi-m" id="oKpiFalhasM"></span></div>
+    </section>
+    <div class="o-head" style="margin-top:18px"><h2>Fornecedores</h2></div>
+    <div class="o-card" id="oProviders"></div>
+    <div class="o-head" style="margin-top:18px"><h2>Como começar</h2></div>
+    <div class="o-card"><div class="o-empty" id="oGuia"></div></div>
+  </section>
+
+  <!-- Contactos -->
+  <section class="o-panel" id="oPanel-contactos" role="tabpanel" aria-labelledby="oTabBtn-contactos" aria-label="Contactos do Outreach">
+    <div class="o-head">
+      <h2>Contactos</h2>
+      <select class="tsel" id="oFiltroContactos" aria-label="Filtrar contactos">
+        <option value="">Todos</option>
+        <option value="com">Com Instagram</option>
+        <option value="sem">Sem Instagram</option>
+        <option value="UNKNOWN">UNKNOWN</option>
+        <option value="ELIGIBLE">ELIGIBLE</option>
+        <option value="NOT_ELIGIBLE">NOT_ELIGIBLE</option>
+        <option value="OPTED_OUT">OPTED_OUT</option>
+      </select>
+      <div class="tfilter"><input type="text" id="oBuscaContactos" placeholder="Filtrar por nome, @, cidade…" aria-label="Filtrar contactos por texto"></div>
+      <div class="o-spacer"></div>
+      <button class="btn btn-sm" type="button" id="oBtnOptOut" disabled>Não contactar</button>
+      <button class="btn btn-sm" type="button" id="oBtnReativar" disabled>Reativar</button>
+      <button class="btn btn-primary btn-sm" type="button" id="oBtnNovaCampanha">Criar campanha</button>
+    </div>
+    <div class="o-card">
+      <div class="o-table-wrap"><table class="o-table" id="oTabContactos"></table></div>
+      <div class="o-pager" id="oPagerContactos"></div>
+    </div>
+  </section>
+
+  <!-- Campanhas -->
+  <section class="o-panel" id="oPanel-campanhas" role="tabpanel" aria-labelledby="oTabBtn-campanhas" aria-label="Campanhas">
+    <div class="o-head">
+      <h2>Campanhas</h2><div class="o-spacer"></div>
+      <button class="btn btn-primary btn-sm" type="button" id="oBtnNovaCampanha2">Nova campanha</button>
+    </div>
+    <div class="o-card"><div class="o-table-wrap"><table class="o-table" id="oTabCampanhas"></table></div></div>
+  </section>
+
+  <!-- Templates -->
+  <section class="o-panel" id="oPanel-templates" role="tabpanel" aria-labelledby="oTabBtn-templates" aria-label="Templates">
+    <div class="o-head">
+      <h2>Templates</h2><div class="o-spacer"></div>
+      <button class="btn btn-primary btn-sm" type="button" id="oBtnNovoTemplate">Novo template</button>
+    </div>
+    <div class="o-card"><div class="o-table-wrap"><table class="o-table" id="oTabTemplates"></table></div></div>
+  </section>
+
+  <!-- Contas -->
+  <section class="o-panel" id="oPanel-contas" role="tabpanel" aria-labelledby="oTabBtn-contas" aria-label="Contas Instagram">
+    <div class="o-head">
+      <h2>Contas Instagram</h2>
+      <span class="o-dim" id="oContasLimite"></span><div class="o-spacer"></div>
+      <button class="btn btn-primary btn-sm" type="button" id="oBtnNovaConta">Ligar conta</button>
+    </div>
+    <div class="o-grid" id="oContasGrid"></div>
+  </section>
+
+  <!-- Fila -->
+  <section class="o-panel" id="oPanel-fila" role="tabpanel" aria-labelledby="oTabBtn-fila" aria-label="Fila de envio">
+    <div class="o-head">
+      <h2>Fila</h2>
+      <select class="tsel" id="oFiltroFila" aria-label="Filtrar fila por campanha"><option value="">Todas as campanhas</option></select>
+      <div class="o-spacer"></div>
+      <button class="btn btn-primary btn-sm" type="button" id="oBtnSimular" hidden>Processar fila</button>
+      <span class="o-dim" id="oEnvioIndisponivel" style="font-size:12px">Envio indisponível</span>
+    </div>
+    <div class="o-card">
+      <div class="o-table-wrap"><table class="o-table" id="oTabFila"></table></div>
+      <div class="o-pager" id="oPagerFila"></div>
+    </div>
+  </section>
+</div><!-- /outreachView -->
+
 </main>
 
 <!-- Barra de seleção flutuante -->
 <div class="selbar" id="selBar">
   <span class="selbar-count"><b id="selCount">0</b> leads selecionados</span>
   <button class="btn btn-sm" id="btnClearSel" type="button">Limpar seleção</button>
+  <button class="btn btn-sm" id="btnAddOutreach" type="button"><svg class="ic"><use href="#ic-plus"/></svg>Adicionar ao Outreach</button>
   <button class="btn btn-primary btn-sm" id="btnExportSel" type="button"><svg class="ic"><use href="#ic-download"/></svg>Exportar seleção</button>
 </div>
 
 <footer class="footer">
   <div class="footer-in">
-    <span>Dados de fontes públicas — OpenStreetMap (ODbL) via Overpass API e Nominatim. Apenas contactos empresariais públicos (RGPD). Confirme sempre os dados antes de qualquer campanha.</span>
-    <span class="footer-ver">LeadMap Pro v1.0.0</span>
+    <span>Dados de fontes públicas — OpenStreetMap (ODbL) via Overpass API e Nominatim. Informações profissionais e empresariais publicamente disponíveis (RGPD). Confirme sempre os dados antes de qualquer campanha.</span>
+    <span class="footer-ver">LeadMap Pro v1.0.1</span>
   </div>
 </footer>
 
@@ -880,6 +1165,140 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   </div>
 </div>
 
+<!-- Preview de uma geração do histórico -->
+<div class="modal-backdrop" id="modalPreview" role="presentation">
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="prevTitle">
+    <div class="modal-head">
+      <h2 id="prevTitle">Pré-visualização</h2>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" data-close aria-label="Fechar"><svg class="ic"><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div id="prevCabecalho"></div>
+      <section class="kpis" id="prevKpis" aria-label="Indicadores desta geração"></section>
+      <div class="o-head" style="margin:4px 0 0">
+        <select class="tsel" id="prevFiltro" aria-label="Filtrar leads desta geração">
+          <option value="">Todas</option>
+          <option value="NOVA">Novas</option>
+          <option value="JA_CAPTURADA">Já captadas</option>
+          <option value="email">Com email</option>
+          <option value="instagram">Com Instagram</option>
+        </select>
+        <span class="o-dim" id="prevContagem" style="font-size:12px"></span>
+        <div class="o-spacer"></div>
+        <button class="btn btn-sm" type="button" id="prevAbrirCompleta">Abrir lista completa</button>
+      </div>
+      <div class="o-card" style="margin-top:2px">
+        <div class="o-table-wrap"><table class="o-table" id="prevTabela"></table></div>
+        <div class="o-pager" id="prevPager"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="modal-note" id="prevNota"></span>
+      <button class="btn" type="button" data-close>Fechar</button>
+      <button class="btn" type="button" id="prevBaixar">Baixar</button>
+      <button class="btn btn-primary" type="button" id="prevRepetir">Repetir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Outreach: ligar conta Instagram -->
+<div class="modal-backdrop" id="oModalConta" role="presentation">
+  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="oContaTitle">
+    <div class="modal-head">
+      <h2 id="oContaTitle">Ligar conta Instagram</h2>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" data-close aria-label="Fechar"><svg class="ic"><use href="#ic-x"/></svg></button>
+    </div>
+    <form id="oFormConta" novalidate>
+      <div class="modal-body">
+        <div class="field">
+          <label for="oContaNome">Nome</label>
+          <input type="text" id="oContaNome" autocomplete="off" placeholder="ex.: Conta principal">
+        </div>
+        <div class="field">
+          <label for="oContaUser">Nome de utilizador <span aria-hidden="true">*</span></label>
+          <input type="text" id="oContaUser" autocomplete="off" placeholder="ex.: @a_minha_loja">
+          <small class="ferr" id="err-oContaUser" role="alert" hidden></small>
+          <div class="fhint">Nunca é pedida a palavra-passe do Instagram.</div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <span class="modal-note"></span>
+        <button class="btn" type="button" data-close>Cancelar</button>
+        <button class="btn btn-primary" type="submit">Adicionar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Outreach: template -->
+<div class="modal-backdrop" id="oModalTemplate" role="presentation">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="oTplTitle">
+    <div class="modal-head">
+      <h2 id="oTplTitle">Novo template</h2>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" data-close aria-label="Fechar"><svg class="ic"><use href="#ic-x"/></svg></button>
+    </div>
+    <form id="oFormTemplate" novalidate>
+      <div class="modal-body">
+        <div class="field">
+          <label for="oTplNome">Nome <span aria-hidden="true">*</span></label>
+          <input type="text" id="oTplNome" autocomplete="off" placeholder="ex.: Primeiro contacto">
+          <small class="ferr" id="err-oTplNome" role="alert" hidden></small>
+        </div>
+        <div class="field">
+          <label for="oTplMsg">Mensagem <span aria-hidden="true">*</span></label>
+          <textarea id="oTplMsg" rows="6" placeholder="Olá {{nome}}, …"></textarea>
+          <small class="ferr" id="err-oTplMsg" role="alert" hidden></small>
+          <div class="o-vars" id="oTplVars"></div>
+          <div class="fhint">Uma variável sem dado no contacto fica por resolver e é assinalada — nunca é preenchida com um valor inventado.</div>
+        </div>
+        <div class="field">
+          <label>Pré-visualização</label>
+          <div class="o-preview" id="oTplPreview"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <span class="modal-note"></span>
+        <button class="btn" type="button" data-close>Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Outreach: assistente de campanha -->
+<div class="modal-backdrop" id="oModalCampanha" role="presentation">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="oCampTitle">
+    <div class="modal-head">
+      <h2 id="oCampTitle">Nova campanha</h2>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" data-close aria-label="Fechar"><svg class="ic"><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="o-steps" id="oCampSteps"></div>
+      <div id="oCampStep"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="modal-note" id="oCampNota"></span>
+      <button class="btn" type="button" id="oCampAnterior">Anterior</button>
+      <button class="btn btn-primary" type="button" id="oCampSeguinte">Seguinte</button>
+    </div>
+  </div>
+</div>
+
+<!-- Outreach: detalhe (contacto ou campanha) -->
+<div class="modal-backdrop" id="oModalDetalhe" role="presentation">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="oDetTitle">
+    <div class="modal-head">
+      <h2 id="oDetTitle">Detalhe</h2>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" data-close aria-label="Fechar"><svg class="ic"><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal-body" id="oDetBody"></div>
+    <div class="modal-foot">
+      <span class="modal-note" id="oDetNota"></span>
+      <button class="btn" type="button" data-close>Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: confirmação genérica -->
 <div class="modal-backdrop" id="confirmModal" role="presentation">
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
@@ -903,7 +1322,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <script>
 'use strict';
 /* =====================================================================
-   LeadMap Pro v1.0.0 — aplicação
+   LeadMap Pro v1.0.1 — aplicação
    Estrutura: CONFIG → utilitários → DataCleaner → Validator →
    MapProviders / PlacesProviders (abstração OSM ↔ Google) →
    dados demo → fluxo de pesquisa → renderização → exportação →
@@ -970,7 +1389,7 @@ const state = {
   leads: [],
   filtered: [],
   selected: new Set(),
-  filters: { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '', tipo: '' },
+  filters: { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '', tipo: '', historico: '' },
   modo: 'local',            /* 'local' | 'portugal' */
   cancelarPesquisa: false,
   sort: { key: 'distanciaKm', dir: 'asc' },
@@ -978,7 +1397,9 @@ const state = {
   currentSource: null,   // 'osm' | 'demo' | null
   hasSearched: false,
   loading: false,
-  lastParams: null
+  lastParams: null,
+  searchId: null,
+  historicoPorId: null
 };
 /* A pesquisa universal é conduzida pelo texto escrito pelo utilizador.
    Nome único de leitura, sem estado duplicado que possa divergir. */
@@ -2463,6 +2884,10 @@ function consolidar(rawLeads, center, dateStr, radiusKm, limite) {
   let cleaned = rawLeads.map(r => {
     const l = cleanLead(r, center, dateStr);
     l.searchQueries = q ? [q] : [];   /* que pesquisa trouxe este lead (§18) */
+    /* O OSM pode chegar depois do prazo e obrigar a reconsolidar tudo. A
+       classificação de histórico já feita não pode perder-se nesse caminho. */
+    const h = state.historicoPorId && state.historicoPorId.get(l.id);
+    if (h) l.historico = h;
     return l;
   });
   cleaned = cleaned.filter(l => l.distanciaKm <= radiusKm + 0.05);   /* nunca fora do raio pedido */
@@ -2551,13 +2976,15 @@ async function runSearch(p) {
 
     /* limpar filtros/seleção antes dos primeiros resultados (render progressivo) */
     state.selected.clear();
-    state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '', tipo: '' };
+    state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '', tipo: '', historico: '' };
     $('#tableFilter').value = '';
     $('#filtroTipo').value = '';
+    $('#filtroHistorico').value = '';
     $('#togglePhone').checked = false;
     $('#toggleSite').checked = false;
     state.sort = { key: 'distanciaKm', dir: 'asc' };
     state.hasSearched = true;
+    state.historicoPorId = null;   /* classificação é por execução */
 
     /* 2. Obter empresas (demo, ou motor multi-fonte) */
     let rawLeads, motorEstado = null;
@@ -2643,7 +3070,22 @@ async function runSearch(p) {
       Array.prototype.push.apply(leads, soPT);
     }
 
-    /* 4. Estado + render */
+    /* 4. Histórico: classificar contra o registo tal como estava ANTES
+          desta pesquisa. Sem o módulo carregado, nada muda. */
+    let histResultado = null;
+    if (window.__historico && window.__historico.disponivel) {
+      try {
+        histResultado = window.__historico.classificar(leads, { modo: state.modo });
+        if (histResultado) {
+          leads.length = 0;
+          Array.prototype.push.apply(leads, histResultado.leads);
+          state.searchId = histResultado.searchId;
+          state.historicoPorId = new Map(histResultado.leads.map(l => [l.id, l.historico]));
+        }
+      } catch (e) { console.warn('[Histórico] classificação', e); }
+    }
+
+    /* 5. Estado + render */
     state.leads = leads;
     renderAll({ animate: true });
     MapP().fitRadius();
@@ -2659,7 +3101,23 @@ async function runSearch(p) {
     if (motorEstado && motorEstado.zonas) msg += ' · ' + motorEstado.zonas.feitas + '/' + motorEstado.zonas.total + ' zonas';
     if (motorEstado && motorEstado.cancelada) msg += ' · pesquisa cancelada';
     if (truncated) msg += ' · a mostrar os ' + CONFIG.maxResults + ' mais próximos';
+    if (histResultado) msg += ' · ' + histResultado.novas + ' novas, ' + histResultado.jaCapturadas + ' já capturadas';
     toast(msg, leads.length ? 'success' : 'info', 6000);
+
+    /* guardar a lista no histórico (não bloqueia o ecrã) */
+    if (histResultado && window.__historico) {
+      window.__historico.registar(histResultado, {
+        criadaEm: new Date().toISOString(),
+        modo: state.modo,
+        query: p.keyword || '',
+        localizacao: state.centerMeta.cidade || state.center.label || state.centerMeta.morada || null,
+        raioKm: state.modo === 'portugal' ? null : p.radiusKm,
+        distrito: null, concelho: null,
+        fontes: (state.currentSource || '').split('+').filter(Boolean),
+        totalBruto: rawLeads.length,
+        estado: (motorEstado && motorEstado.cancelada) ? 'CANCELADA' : 'CONCLUIDA'
+      }).catch(e => console.warn('[Histórico] registo', e));
+    }
   } catch (err) {
     console.error('[Pesquisa]', err);
     const msg = err && err.userMessage ? err.userMessage : 'Ocorreu um erro inesperado durante a pesquisa.';
@@ -2738,6 +3196,19 @@ function digitalHtml(l) {
   return h + '</div>';
 }
 
+/* Histórico de capturas desta lead. Sem dados, nada é afirmado. */
+function historicoHtml(l) {
+  const h = l.historico;
+  if (!h) return '';
+  const linhas = [
+    ['Primeira captura', fmtDataCurta(h.firstCapturedAt)],
+    ['Última captura', fmtDataCurta(h.lastCapturedAt)],
+    ['Capturada', (Number(h.captureCount) || 1) + (Number(h.captureCount) === 1 ? ' vez' : ' vezes')]
+  ];
+  return '<dl class="pop-dl" style="margin-top:6px">' +
+    linhas.map(([r, v]) => '<dt>' + r + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>';
+}
+
 function popupHtml(l) {
   let h = '<div class="pop">';
   h += '<div>' + nicheBadge(l) + '</div>';
@@ -2746,6 +3217,7 @@ function popupHtml(l) {
   if (l.telefone !== ND) h += '<div class="pop-line mono">' + esc(l.telefone) + '</div>';
   if (l.telemovel !== ND) h += '<div class="pop-line mono">' + esc(l.telemovel) + '</div>';
   h += digitalHtml(l);
+  h += historicoHtml(l);
   h += '<div class="pop-meta mono">' + fmtKm(l.distanciaKm) + ' km · ' + esc(fonteLabel(l)) + '</div>';
   h += '<div class="pop-actions"><a class="pop-btn" target="_blank" rel="noopener" href="' + gmapsUrl(l) + '">Abrir no Google Maps</a>';
   h += '<a class="pop-btn" target="_blank" rel="noopener" href="' + earthUrl(l) + '">Ver no Google Earth</a></div>';
@@ -2763,6 +3235,7 @@ function computeFiltered() {
     if (f.distrito && l.distrito !== f.distrito) return false;
     if (f.concelho && l.concelho !== f.concelho) return false;
     if (f.tipo && (l.leadType || 'UNKNOWN') !== f.tipo) return false;
+    if (f.historico && (!l.historico || l.historico.estado !== f.historico)) return false;
     if (txt) {
       const hay = normalizeStr([l.nome, l.segmento, l.morada, l.localidade, l.codigoPostal].join(' '));
       if (!hay.includes(txt)) return false;
@@ -2800,6 +3273,32 @@ function cellText(v, cls) {
   return '<span class="' + (cls || '') + '" title="' + esc(v) + '">' + esc(v) + '</span>';
 }
 
+/* Estado histórico de uma lead. Sem histórico disponível não se afirma
+   nada: a célula fica vazia em vez de mentir que a lead é nova. */
+function histCell(l) {
+  const h = l.historico;
+  if (!h) return '<span class="nd">' + ND + '</span>';
+  if (h.estado === 'JA_CAPTURADA') {
+    const n = Number(h.captureCount) || 2;
+    return '<span class="hist-badge hist-rep" title="Primeira captura: ' +
+      esc(fmtDataCurta(h.firstCapturedAt)) + '">Já capturada · ' + n + 'x</span>';
+  }
+  return '<span class="hist-badge hist-nova">Nova</span>';
+}
+function fmtDataHora(iso) {
+  if (!iso) return ND;
+  const d = new Date(iso);
+  if (isNaN(d)) return ND;
+  return fmtDateTime(d);
+}
+function fmtDataCurta(iso) {
+  if (!iso) return ND;
+  const d = new Date(iso);
+  if (isNaN(d)) return ND;
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+}
+
 function renderTable(opts) {
   const animate = opts && opts.animate && !reduceMotion;
   const tbody = $('#leadsTbody');
@@ -2822,6 +3321,7 @@ function renderTable(opts) {
     h += '<td class="td-soc">' + socCell(l) + '</td>';
     h += '<td class="td-num">' + fmtKm(l.distanciaKm) + ' km</td>';
     h += '<td class="td-src" title="' + esc(fonteLabel(l)) + '">' + esc(fonteLabel(l)) + '</td>';
+    h += '<td class="td-hist">' + histCell(l) + '</td>';
     h += '<td><span class="row-act">' +
       '<a href="' + gmapsUrl(l) + '" target="_blank" rel="noopener" title="Abrir no Google Maps" aria-label="Abrir no Google Maps">' + ic('map') + '</a>' +
       '<a href="' + earthUrl(l) + '" target="_blank" rel="noopener" title="Ver no Google Earth" aria-label="Ver no Google Earth">' + ic('globe') + '</a>' +
@@ -2916,15 +3416,21 @@ function renderKPIs() {
   const nMob = L.filter(l => l.telemovel !== ND).length;
   const nSoc = L.filter(l => l.instagram !== ND || l.facebook !== ND || l.linkedin !== ND).length;
   const nEmail = L.filter(l => l.emails && l.emails.length).length;
+  const nNovas = L.filter(l => l.historico && l.historico.estado === 'NOVA').length;
+  const nRep = L.filter(l => l.historico && l.historico.estado === 'JA_CAPTURADA').length;
   countTo($('#kpiFound .kpi-v'), total);
   countTo($('#kpiSel .kpi-v'), state.selected.size);
   countTo($('#kpiEmail .kpi-v'), nEmail);
+  countTo($('#kpiNovas .kpi-v'), nNovas);
+  countTo($('#kpiRepetidas .kpi-v'), nRep);
   countTo($('#kpiSite .kpi-v'), nSite);
   countTo($('#kpiMobile .kpi-v'), nMob);
   countTo($('#kpiSocial .kpi-v'), nSoc);
   $('#kpiFoundM').textContent = state.hasSearched ? ('raio ' + state.radiusKm + ' km') : '';
   $('#kpiSelM').textContent = state.selected.size ? 'prontos a exportar' : '';
   $('#kpiEmailM').textContent = pct(nEmail, total);
+  $('#kpiNovasM').textContent = pct(nNovas, total);
+  $('#kpiRepetidasM').textContent = nRep ? pct(nRep, total) : '';
   $('#kpiSiteM').textContent = pct(nSite, total);
   $('#kpiMobileM').textContent = pct(nMob, total);
   $('#kpiSocialM').textContent = pct(nSoc, total);
@@ -2976,7 +3482,7 @@ function toggleEmptyState() {
       $('#emptyText').textContent = 'Experimente aumentar o raio ou descrever a atividade de outra forma (ex.: “canalizadores” em vez de “picheleiros”). As fontes públicas nem sempre cobrem todos os negócios.';
     } else {
       $('#emptyTitle').textContent = 'Defina o território e comece a prospeção';
-      $('#emptyText').textContent = 'Escolha localização, raio e nicho em "Nova Pesquisa", ou carregue o conjunto de demonstração para explorar a ferramenta.';
+      $('#emptyText').textContent = 'Escolha localização, raio e o que pretende pesquisar em "Nova Pesquisa".';
     }
   }
 }
@@ -3016,8 +3522,8 @@ function renderAll(opts) {
 /* ---------- 11. Exportação (XLSX com fallback CSV) ---------- */
 function leadsToRows(list) {
   return list.map(l => ({
-    'Empresa': l.nome,
-    'Nicho': nichoLabel(l),
+    'Empresa / Profissional': l.nome,
+    'Atividade': nichoLabel(l),
     'Segmento': l.segmento,
     'Morada': l.morada,
     'Código Postal': l.codigoPostal,
@@ -3036,12 +3542,16 @@ function leadsToRows(list) {
     'Distância (km)': l.distanciaKm,
     'Fonte': fonteLabel(l),
     'Pesquisa': (l.searchQueries && l.searchQueries.length) ? l.searchQueries.join('; ') : ND,
+    'Lead já capturada': l.historico ? (l.historico.estado === 'JA_CAPTURADA' ? 'SIM' : 'NÃO') : ND,
+    'Número de capturas': l.historico ? (Number(l.historico.captureCount) || 1) : ND,
+    'Primeira captura': (l.historico && l.historico.firstCapturedAt) ? fmtDataHora(l.historico.firstCapturedAt) : ND,
+    'ID da pesquisa': (l.historico && l.historico.firstSearchId) ? l.historico.firstSearchId : (state.searchId || ND),
     'Data da Pesquisa': l.dataPesquisa
   }));
 }
 function buildWorkbook(list) {
   const ws = XLSX.utils.json_to_sheet(leadsToRows(list));
-  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 16 }, { wch: 18 }, { wch: 17 }, { wch: 17 }, { wch: 34 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 24 }, { wch: 17 }];
+  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 16 }, { wch: 18 }, { wch: 17 }, { wch: 17 }, { wch: 34 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 24 }, { wch: 16 }, { wch: 17 }, { wch: 18 }, { wch: 20 }, { wch: 17 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leads');
   return wb;
@@ -3398,6 +3908,10 @@ function bindEvents() {
   });
   $('#filtroTipo').addEventListener('change', e => {
     state.filters.tipo = e.target.value;
+    renderAll();
+  });
+  $('#filtroHistorico').addEventListener('change', e => {
+    state.filters.historico = e.target.value;
     renderAll();
   });
 
@@ -3854,6 +4368,1133 @@ window.LeadMapPro = { state, CONFIG, NICHES, DataCleaner, Validator, runSearch, 
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
+</script>
+
+<script type="module">
+/* =====================================================================
+   30. OUTREACH — interface (Fase B, SIMULAÇÃO)
+   ---------------------------------------------------------------------
+   Módulo ESM: importa o domínio do Outreach e o MockInstagramProvider da
+   Fase A. Nenhuma capacidade, estado ou código de erro é redefinido aqui.
+
+   MODO DE SIMULAÇÃO: nada nesta secção envia mensagens. O processamento
+   passa pelo fornecedor mock e os dados vivem em localStorage, sob a
+   chave versionada leadmap_outreach_v1 (persistência temporária).
+   ===================================================================== */
+
+let O = null;          /* módulo de domínio */
+let IG = null;         /* módulo Instagram da Fase A */
+let store = null;
+let est = null;
+let mockProvider = null;
+
+const OUT = {
+  aba: 'dashboard',
+  selecao: new Set(),
+  pagina: { contactos: 1, fila: 1 },
+  porPagina: 100,       /* nunca se despejam milhares de linhas de uma vez */
+  filtro: { contactos: '', texto: '', fila: '' },
+  wizard: null,
+  templateEdicao: null
+};
+
+/* ---------- arranque ---------- */
+
+async function iniciarOutreach() {
+  try {
+    IG = await import('./providers/instagram/index.mjs');
+    O = await import('./providers/outreach/model.mjs');
+    const S = await import('./providers/outreach/store.mjs');
+    store = new S.LocalOutreachStore({ estadoInicial: O.estadoInicial });
+    est = store.load();
+    mockProvider = new IG.MockInstagramProvider({ script: {} });
+    ligarEventosOutreach();
+    renderOutreach();
+    if (store.ultimoErro) toast('Outreach: ' + store.ultimoErro, 'warn', 6000);
+  } catch (err) {
+    console.warn('[Outreach] módulos indisponíveis', err);
+    const v = $('#outreachView');
+    if (v) {
+      v.innerHTML = '<div class="o-card"><div class="o-empty">' +
+        '<h3>Outreach indisponível neste modo</h3>' +
+        '<p>Esta secção carrega módulos JavaScript e precisa de ser servida por HTTP. ' +
+        'Abra a aplicação a partir de um servidor (ou do endereço publicado) em vez de um ficheiro local.</p></div></div>';
+    }
+    $('#navOutreach').disabled = true;
+    $('#navOutreach').title = 'Precisa de ser servido por HTTP';
+  }
+}
+
+function guardar() {
+  try { store.save(est); }
+  catch (err) { console.error('[Outreach] gravação recusada', err); toast(err.message, 'error', 7000); }
+}
+
+/* ---------- navegação entre vistas ---------- */
+
+function mostrarVista(qual) {
+  const outreach = qual === 'outreach';
+  $('#leadsView').hidden = outreach;
+  $('#outreachView').hidden = !outreach;
+  $('#navLeads').setAttribute('aria-selected', String(!outreach));
+  $('#navOutreach').setAttribute('aria-selected', String(outreach));
+  $('#selBar').classList.toggle('hidden-view', outreach);
+  if (outreach) renderOutreach();
+}
+
+function mostrarAba(nome) {
+  OUT.aba = nome;
+  $$('#outreachView .o-tabs button').forEach(b =>
+    b.setAttribute('aria-selected', String(b.dataset.otab === nome)));
+  $$('#outreachView .o-panel').forEach(p =>
+    p.classList.toggle('on', p.id === 'oPanel-' + nome));
+  renderOutreach();
+}
+
+/* ---------- helpers de apresentação ---------- */
+
+const nf = n => Number(n || 0).toLocaleString('pt-PT');
+const marca = (txt, cls) => '<span class="o-status s-' + cls + '">' + esc(txt) + '</span>';
+const vazio = (titulo, texto, acao) =>
+  '<div class="o-empty"><h3>' + esc(titulo) + '</h3><p>' + esc(texto) + '</p>' + (acao || '') + '</div>';
+
+function nomeConta(id) {
+  const c = est.contas.find(x => x.id === id);
+  return c ? '@' + c.username : '—';
+}
+function nomeCampanha(id) {
+  const k = est.campanhas.find(x => x.id === id);
+  return k ? k.nome : '—';
+}
+function contactoPorId(id) { return est.contactos.find(c => c.id === id) || null; }
+
+/* ---------- render principal ---------- */
+
+function renderOutreach() {
+  if (!est) return;
+  $('#nContactos').textContent = nf(est.contactos.length);
+  $('#nCampanhas').textContent = nf(est.campanhas.length);
+  $('#nTemplates').textContent = nf(est.templates.length);
+  $('#nContas').textContent = nf(est.contas.length);
+  $('#nFila').textContent = nf(est.fila.length);
+
+  if (OUT.aba === 'dashboard') renderDashboard();
+  else if (OUT.aba === 'contactos') renderContactos();
+  else if (OUT.aba === 'campanhas') renderCampanhas();
+  else if (OUT.aba === 'templates') renderTemplates();
+  else if (OUT.aba === 'contas') renderContas();
+  else if (OUT.aba === 'fila') renderFila();
+}
+
+/* ---------- Dashboard ---------- */
+
+function renderDashboard() {
+  const k = O.kpisGerais(est);
+  $('#oKpiContactos').textContent = nf(k.contactos);
+  $('#oKpiInsta').textContent = nf(k.comInstagram);
+  $('#oKpiCamp').textContent = nf(k.campanhas);
+  $('#oKpiPend').textContent = nf(k.pendentes);
+  $('#oKpiEnv').textContent = nf(k.enviados);
+  $('#oKpiResp').textContent = nf(k.respostas);
+  $('#oKpiContactosM').textContent = k.contactos ? (k.contactos - k.comInstagram) + ' sem Instagram' : '';
+  $('#oKpiInstaM').textContent = k.contactos ? Math.round(k.comInstagram / k.contactos * 100) + '%' : '';
+  $('#oKpiCampM').textContent = k.ativas ? k.ativas + ' ativas' : '';
+  $('#oKpiFalhasM').textContent = k.falhas ? k.falhas + ' falhas' : '';
+
+  /* Fornecedores: estados reais, sem prometer o que não está disponível */
+  $('#oProviders').innerHTML = [
+    linhaProvider('Meta', 'Por configurar', 'UNKNOWN', 'Integração oficial da Meta. Ainda não disponível para envio.'),
+    linhaProvider('Outro fornecedor', 'Não configurado', 'UNKNOWN', 'Nenhum fornecedor configurado.')
+  ].join('');
+
+  const passos = [];
+  if (!est.contas.length) passos.push('ligar uma conta Instagram');
+  if (!est.contactos.length) passos.push('adicionar leads ao Outreach a partir da pesquisa');
+  if (!est.templates.length) passos.push('criar um template');
+  if (!est.campanhas.length) passos.push('criar uma campanha');
+  $('#oGuia').innerHTML = passos.length
+    ? '<h3>Faltam ' + passos.length + ' passos</h3><p>Para experimentar o fluxo completo: ' + esc(passos.join(', ')) + '.</p>'
+    : '<h3>Tudo pronto</h3><p>Já tem contas, contactos, templates e campanhas. O envio fica disponível assim que um fornecedor estiver configurado.</p>';
+}
+
+function linhaProvider(nome, estado, cls, nota) {
+  return '<div class="o-prov-row"><b>' + esc(nome) + '</b>' +
+    '<span class="o-dim" style="font-size:12px">' + esc(nota) + '</span>' +
+    '<div class="o-spacer"></div>' + marca(estado, cls) + '</div>';
+}
+
+/* ---------- Contactos ---------- */
+
+function contactosFiltrados() {
+  const f = OUT.filtro.contactos;
+  const t = normalizeStr(OUT.filtro.texto.trim());
+  return est.contactos.filter(c => {
+    if (f === 'com' && !c.temInstagram) return false;
+    if (f === 'sem' && c.temInstagram) return false;
+    if (f && f !== 'com' && f !== 'sem' && c.status !== f) return false;
+    if (t) {
+      const hay = normalizeStr([c.nome, c.instagram, c.cidade, c.distrito, c.atividade].filter(Boolean).join(' '));
+      if (!hay.includes(t)) return false;
+    }
+    return true;
+  });
+}
+
+function renderContactos() {
+  const lista = contactosFiltrados();
+  const tab = $('#oTabContactos');
+
+  if (!est.contactos.length) {
+    tab.innerHTML = '';
+    $('#oPagerContactos').innerHTML = '';
+    tab.closest('.o-card').querySelector('.o-table-wrap').innerHTML =
+      vazio('Sem contactos', 'Faça uma pesquisa, selecione leads na tabela e use "Adicionar ao Outreach".');
+    return;
+  }
+  const wrap = tab.closest('.o-card').querySelector('.o-table-wrap');
+  if (!wrap.querySelector('table')) wrap.innerHTML = '<table class="o-table" id="oTabContactos"></table>';
+
+  const totalPag = Math.max(1, Math.ceil(lista.length / OUT.porPagina));
+  if (OUT.pagina.contactos > totalPag) OUT.pagina.contactos = totalPag;
+  const ini = (OUT.pagina.contactos - 1) * OUT.porPagina;
+  const pagina = lista.slice(ini, ini + OUT.porPagina);
+
+  const linhas = pagina.map(c => {
+    const ig = c.temInstagram
+      ? '<a href="https://instagram.com/' + esc(c.instagram) + '" target="_blank" rel="noopener noreferrer">@' + esc(c.instagram) + '</a>'
+      : marca('SEM INSTAGRAM', 'OPTED_OUT');
+    return '<tr data-cid="' + esc(c.id) + '">' +
+      '<td><input type="checkbox" class="o-sel" data-cid="' + esc(c.id) + '"' + (OUT.selecao.has(c.id) ? ' checked' : '') + ' aria-label="Selecionar ' + esc(c.nome) + '"></td>' +
+      '<td><button type="button" class="btn btn-ghost btn-sm o-det-contacto" data-cid="' + esc(c.id) + '">' + esc(c.nome) + '</button></td>' +
+      '<td class="o-dim">' + esc(c.empresa || '—') + '</td>' +
+      '<td class="o-nowrap">' + ig + '</td>' +
+      '<td class="o-dim">' + esc(c.atividade || '—') + '</td>' +
+      '<td class="o-dim">' + esc(c.cidade || '—') + '</td>' +
+      '<td class="o-dim">' + esc(c.distrito || '—') + '</td>' +
+      '<td class="o-dim">' + esc(c.origem || '—') + '</td>' +
+      '<td>' + marca(c.status, c.status) + '</td>' +
+      '<td class="o-dim">' + (c.campanhas.length || '—') + '</td>' +
+      '<td class="o-dim o-nowrap">' + esc(c.ultimaAcao ? c.ultimaAcao.slice(0, 10) : '—') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  wrap.querySelector('table').innerHTML =
+    '<thead><tr><th style="width:34px"><input type="checkbox" id="oSelAll" aria-label="Selecionar todos os visíveis"></th>' +
+    '<th>Nome</th><th>Empresa</th><th>Instagram</th><th>Atividade</th><th>Cidade</th><th>Distrito</th>' +
+    '<th>Origem</th><th>Estado</th><th>Camp.</th><th>Última ação</th></tr></thead><tbody>' + linhas + '</tbody>';
+
+  $('#oPagerContactos').innerHTML =
+    '<span>' + nf(lista.length) + ' contactos' + (OUT.selecao.size ? ' · ' + nf(OUT.selecao.size) + ' selecionados' : '') + '</span>' +
+    '<div class="o-spacer"></div>' +
+    (totalPag > 1
+      ? '<button class="btn btn-sm" type="button" id="oPagPrev"' + (OUT.pagina.contactos === 1 ? ' disabled' : '') + '>Anterior</button>' +
+        '<span>Página ' + OUT.pagina.contactos + ' de ' + totalPag + '</span>' +
+        '<button class="btn btn-sm" type="button" id="oPagNext"' + (OUT.pagina.contactos === totalPag ? ' disabled' : '') + '>Seguinte</button>'
+      : '');
+
+  const algum = OUT.selecao.size > 0;
+  $('#oBtnOptOut').disabled = !algum;
+  $('#oBtnReativar').disabled = !algum;
+}
+
+/* ---------- Campanhas ---------- */
+
+function renderCampanhas() {
+  const wrap = $('#oPanel-campanhas .o-table-wrap');
+  if (!est.campanhas.length) {
+    wrap.innerHTML = vazio('Sem campanhas', 'Crie uma campanha a partir dos contactos com Instagram.');
+    return;
+  }
+  const linhas = est.campanhas.map(k => {
+    const kp = O.kpisCampanha(est, k.id);
+    return '<tr>' +
+      '<td><button type="button" class="btn btn-ghost btn-sm o-det-campanha" data-kid="' + esc(k.id) + '">' + esc(k.nome) + '</button></td>' +
+      '<td class="o-nowrap">' + esc(nomeConta(k.contaId)) + '</td>' +
+      '<td class="o-dim o-nowrap">' + esc(k.provider) + '</td>' +
+      '<td>' + nf(k.contactoIds.length) + '</td>' +
+      '<td>' + nf(kp.pendentes) + '</td>' +
+      '<td>' + nf(kp.enviados) + '</td>' +
+      '<td>' + nf(kp.falhas) + '</td>' +
+      '<td>' + nf(kp.respostas) + '</td>' +
+      '<td>' + marca(k.status, k.status) + '</td>' +
+      '<td class="o-dim o-nowrap">' + esc((k.criadaEm || '').slice(0, 10)) + '</td>' +
+      '<td class="o-nowrap">' + acoesCampanha(k) + '</td></tr>';
+  }).join('');
+  wrap.innerHTML = '<table class="o-table"><thead><tr><th>Nome</th><th>Conta</th><th>Provider</th><th>Contactos</th>' +
+    '<th>Pend.</th><th>Env.</th><th>Falhas</th><th>Resp.</th><th>Estado</th><th>Data</th><th>Ações</th></tr></thead>' +
+    '<tbody>' + linhas + '</tbody></table>';
+}
+
+function acoesCampanha(k) {
+  const b = (accao, txt) => '<button class="btn btn-sm o-camp-acao" type="button" data-kid="' + esc(k.id) + '" data-acao="' + accao + '">' + txt + '</button> ';
+  let html = '';
+  if (k.status === O.CAMPAIGN_STATUS.DRAFT || k.status === O.CAMPAIGN_STATUS.READY) html += b('fila', 'Gerar fila');
+  if (k.status === O.CAMPAIGN_STATUS.RUNNING || k.status === O.CAMPAIGN_STATUS.READY) html += b('PAUSED', 'Pausar');
+  if (k.status === O.CAMPAIGN_STATUS.PAUSED) html += b('RUNNING', 'Retomar');
+  if (k.status !== O.CAMPAIGN_STATUS.CANCELLED && k.status !== O.CAMPAIGN_STATUS.COMPLETED) html += b('CANCELLED', 'Cancelar');
+  return html || '<span class="o-dim">—</span>';
+}
+
+/* ---------- Templates ---------- */
+
+function renderTemplates() {
+  const wrap = $('#oPanel-templates .o-table-wrap');
+  if (!est.templates.length) {
+    wrap.innerHTML = vazio('Sem templates', 'Crie uma mensagem reutilizável com variáveis como {{nome}} ou {{cidade}}.');
+    return;
+  }
+  const linhas = est.templates.map(t => {
+    const vars = O.variaveisDe(t.mensagem);
+    return '<tr><td><b>' + esc(t.nome) + '</b></td>' +
+      '<td class="o-dim">' + esc(t.mensagem.slice(0, 90)) + (t.mensagem.length > 90 ? '…' : '') + '</td>' +
+      '<td class="o-dim o-nowrap">' + (vars.length ? vars.map(v => '{{' + esc(v) + '}}').join(' ') : '—') + '</td>' +
+      '<td class="o-nowrap">' +
+        '<button class="btn btn-sm o-tpl-acao" data-tid="' + esc(t.id) + '" data-acao="editar" type="button">Editar</button> ' +
+        '<button class="btn btn-sm o-tpl-acao" data-tid="' + esc(t.id) + '" data-acao="duplicar" type="button">Duplicar</button> ' +
+        '<button class="btn btn-sm o-tpl-acao" data-tid="' + esc(t.id) + '" data-acao="eliminar" type="button">Eliminar</button>' +
+      '</td></tr>';
+  }).join('');
+  wrap.innerHTML = '<table class="o-table"><thead><tr><th>Nome</th><th>Mensagem</th><th>Variáveis</th><th>Ações</th></tr></thead>' +
+    '<tbody>' + linhas + '</tbody></table>';
+}
+
+/* ---------- Contas ---------- */
+
+function renderContas() {
+  const grid = $('#oContasGrid');
+  $('#oContasLimite').textContent = est.contas.length + ' de ' + O.MAX_CONTAS + ' contas';
+  $('#oBtnNovaConta').disabled = est.contas.length >= O.MAX_CONTAS;
+
+  if (!est.contas.length) {
+    grid.innerHTML = '<div class="o-card">' + vazio('Sem contas ligadas',
+      'Ligue uma conta para preparar campanhas. Nunca é pedida a palavra-passe do Instagram.') + '</div>';
+    return;
+  }
+  const rotulos = {
+    canSendMessage: 'Envio', canReadConversations: 'Conversas', canFetchProfile: 'Perfil',
+    canFetchDeliveryStatus: 'Delivery Status', canCheckEligibility: 'Elegibilidade', canReceiveWebhooks: 'Webhooks'
+  };
+  /* capacidades reais do fornecedor da Fase A — não uma segunda lista */
+  const caps = mockProvider.capabilities;
+  grid.innerHTML = est.contas.map(c =>
+    '<div class="o-card o-acct">' +
+      '<div class="o-acct-top">' +
+        '<span class="o-avatar">' + esc((c.displayName || c.username).slice(0, 2).toUpperCase()) + '</span>' +
+        '<span class="o-acct-id"><b>' + esc(c.displayName) + '</b><span>@' + esc(c.username) + '</span></span>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' + marca(c.status, c.status) +
+        '<span class="o-dim" style="font-size:11.5px">' + esc(c.provider) + '</span></div>' +
+      '<div class="o-caps">' + IG.CAPABILITIES.map(k =>
+        '<span class="o-cap' + (caps[k] ? ' yes' : '') + '">' + (caps[k] ? '✓ ' : '') + esc(rotulos[k] || k) + '</span>').join('') + '</div>' +
+      '<div><button class="btn btn-sm o-conta-remover" type="button" data-aid="' + esc(c.id) + '">Remover</button></div>' +
+    '</div>').join('');
+}
+
+/* ---------- Fila ---------- */
+
+function renderFila() {
+  const sel = $('#oFiltroFila');
+  const atual = OUT.filtro.fila;
+  sel.innerHTML = '<option value="">Todas as campanhas</option>' +
+    est.campanhas.map(k => '<option value="' + esc(k.id) + '"' + (k.id === atual ? ' selected' : '') + '>' + esc(k.nome) + '</option>').join('');
+
+  const lista = est.fila.filter(i => !atual || i.campanhaId === atual);
+  const wrap = $('#oPanel-fila .o-table-wrap');
+  /* §28/§29: sem fornecedor de envio configurado, a ação não é oferecida
+     e nenhum estado de entrega é fabricado. */
+  $('#oBtnSimular').hidden = true;
+  const aviso = $('#oEnvioIndisponivel');
+  if (aviso) aviso.hidden = false;
+
+  if (!lista.length) {
+    wrap.innerHTML = vazio('Fila vazia', 'Crie uma campanha e use "Gerar fila" para preparar os envios.');
+    $('#oPagerFila').innerHTML = '';
+    return;
+  }
+  const totalPag = Math.max(1, Math.ceil(lista.length / OUT.porPagina));
+  if (OUT.pagina.fila > totalPag) OUT.pagina.fila = totalPag;
+  const ini = (OUT.pagina.fila - 1) * OUT.porPagina;
+
+  const linhas = lista.slice(ini, ini + OUT.porPagina).map(i => {
+    const c = contactoPorId(i.contactoId);
+    return '<tr><td>' + esc(c ? c.nome : '—') + '</td>' +
+      '<td class="o-nowrap">@' + esc(i.instagram || '—') + '</td>' +
+      '<td>' + esc(nomeCampanha(i.campanhaId)) + '</td>' +
+      '<td class="o-nowrap">' + esc(nomeConta(i.contaId)) + '</td>' +
+      '<td class="o-dim">' + esc(i.provider) + '</td>' +
+      '<td>' + marca(i.status, i.status) + '</td>' +
+      '<td>' + i.tentativas + '</td>' +
+      '<td class="o-dim o-nowrap">' + esc(i.ultimaTentativa ? i.ultimaTentativa.slice(11, 16) : '—') + '</td>' +
+      '<td class="o-dim">' + esc(i.erro || '—') + '</td></tr>';
+  }).join('');
+
+  wrap.innerHTML = '<table class="o-table"><thead><tr><th>Contacto</th><th>Instagram</th><th>Campanha</th><th>Conta</th>' +
+    '<th>Provider</th><th>Estado</th><th>Tent.</th><th>Última</th><th>Erro</th></tr></thead><tbody>' + linhas + '</tbody></table>';
+
+  $('#oPagerFila').innerHTML = '<span>' + nf(lista.length) + ' itens</span><div class="o-spacer"></div>' +
+    (totalPag > 1
+      ? '<button class="btn btn-sm" type="button" id="oFilaPrev"' + (OUT.pagina.fila === 1 ? ' disabled' : '') + '>Anterior</button>' +
+        '<span>Página ' + OUT.pagina.fila + ' de ' + totalPag + '</span>' +
+        '<button class="btn btn-sm" type="button" id="oFilaNext"' + (OUT.pagina.fila === totalPag ? ' disabled' : '') + '>Seguinte</button>'
+      : '');
+}
+
+/* ---------- adicionar leads ao Outreach ---------- */
+
+function adicionarSelecionadosAoOutreach() {
+  if (!O) { toast('Outreach indisponível neste modo.', 'warn'); return; }
+  const escolhidos = state.leads.filter(l => state.selected.has(l.id));
+  const leads = escolhidos.length ? escolhidos : state.filtered;
+  if (!leads.length) { toast('Não há leads para adicionar.', 'info'); return; }
+
+  const r = O.adicionarContactos(est, leads, { origem: state.searchQuery || 'pesquisa' });
+  guardar();
+  renderOutreach();
+  let msg = r.adicionados + ' contactos adicionados';
+  if (r.atualizados) msg += ' · ' + r.atualizados + ' já existiam e foram atualizados';
+  if (r.semInstagram) msg += ' · ' + r.semInstagram + ' sem Instagram (não entram em campanhas)';
+  toast(msg, 'success', 6000);
+}
+
+/* ---------- eventos ---------- */
+
+function ligarEventosOutreach() {
+  $('#navLeads').addEventListener('click', () => mostrarVista('leads'));
+  $('#navOutreach').addEventListener('click', () => mostrarVista('outreach'));
+  const tabs = $$('#outreachView .o-tabs button');
+  tabs.forEach((b, i) => {
+    b.addEventListener('click', () => mostrarAba(b.dataset.otab));
+    /* setas percorrem os separadores, como manda a prática ARIA */
+    b.addEventListener('keydown', e => {
+      const passo = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!passo) return;
+      e.preventDefault();
+      const alvo = tabs[(i + passo + tabs.length) % tabs.length];
+      alvo.focus(); mostrarAba(alvo.dataset.otab);
+    });
+  });
+  $('#btnAddOutreach').addEventListener('click', adicionarSelecionadosAoOutreach);
+
+  /* contactos */
+  $('#oFiltroContactos').addEventListener('change', e => { OUT.filtro.contactos = e.target.value; OUT.pagina.contactos = 1; renderContactos(); });
+  $('#oBuscaContactos').addEventListener('input', e => { OUT.filtro.texto = e.target.value; OUT.pagina.contactos = 1; renderContactos(); });
+  $('#oPanel-contactos').addEventListener('click', e => {
+    const cb = e.target.closest('.o-sel');
+    if (cb) { cb.checked ? OUT.selecao.add(cb.dataset.cid) : OUT.selecao.delete(cb.dataset.cid); renderContactos(); return; }
+    if (e.target.id === 'oSelAll') {
+      const vis = contactosFiltrados().slice((OUT.pagina.contactos - 1) * OUT.porPagina, OUT.pagina.contactos * OUT.porPagina);
+      vis.forEach(c => e.target.checked ? OUT.selecao.add(c.id) : OUT.selecao.delete(c.id));
+      renderContactos(); return;
+    }
+    if (e.target.id === 'oPagPrev') { OUT.pagina.contactos--; renderContactos(); return; }
+    if (e.target.id === 'oPagNext') { OUT.pagina.contactos++; renderContactos(); return; }
+    const det = e.target.closest('.o-det-contacto');
+    if (det) { abrirDetalheContacto(det.dataset.cid); return; }
+  });
+  $('#oBtnOptOut').addEventListener('click', () => { alterarOptOut(true); });
+  $('#oBtnReativar').addEventListener('click', () => { alterarOptOut(false); });
+  $('#oBtnNovaCampanha').addEventListener('click', abrirWizard);
+  $('#oBtnNovaCampanha2').addEventListener('click', abrirWizard);
+
+  /* templates */
+  $('#oBtnNovoTemplate').addEventListener('click', () => abrirTemplate(null));
+  $('#oPanel-templates').addEventListener('click', e => {
+    const b = e.target.closest('.o-tpl-acao');
+    if (!b) return;
+    const t = est.templates.find(x => x.id === b.dataset.tid);
+    if (!t) return;
+    if (b.dataset.acao === 'editar') abrirTemplate(t);
+    else if (b.dataset.acao === 'duplicar') { O.duplicarTemplate(est, t.id); guardar(); renderOutreach(); toast('Template duplicado.', 'success'); }
+    else if (b.dataset.acao === 'eliminar') {
+      confirmDialog({ title: 'Eliminar template', msg: 'Eliminar "' + t.nome + '"? As campanhas já criadas mantêm a mensagem.', okLabel: 'Eliminar' }).then(ok => {
+        if (!ok) return;
+        O.eliminarTemplate(est, t.id); guardar(); renderOutreach(); toast('Template eliminado.', 'success');
+      });
+    }
+  });
+  $('#oFormTemplate').addEventListener('submit', submeterTemplate);
+  $('#oTplMsg').addEventListener('input', preverTemplate);
+  $('#oTplVars').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const ta = $('#oTplMsg');
+    const pos = ta.selectionStart || ta.value.length;
+    ta.value = ta.value.slice(0, pos) + b.dataset.v + ta.value.slice(ta.selectionEnd || pos);
+    ta.focus(); preverTemplate();
+  });
+
+  /* contas */
+  $('#oBtnNovaConta').addEventListener('click', () => {
+    if (est.contas.length >= O.MAX_CONTAS) { toast('Limite máximo de ' + O.MAX_CONTAS + ' contas conectadas.', 'warn', 6000); return; }
+    $('#oContaNome').value = ''; $('#oContaUser').value = '';
+    setFieldState($('#oContaUser'), '', { neutral: true });
+    openModal($('#oModalConta'));
+  });
+  $('#oFormConta').addEventListener('submit', submeterConta);
+  $('#oContasGrid').addEventListener('click', e => {
+    const b = e.target.closest('.o-conta-remover'); if (!b) return;
+    const c = est.contas.find(x => x.id === b.dataset.aid);
+    confirmDialog({ title: 'Remover conta', msg: 'Remover ' + (c ? '@' + c.username : 'esta conta') + ' do Outreach?', okLabel: 'Remover' }).then(ok => {
+      if (!ok) return;
+      O.removerConta(est, b.dataset.aid); guardar(); renderOutreach(); toast('Conta removida.', 'success');
+    });
+  });
+
+  /* campanhas */
+  $('#oPanel-campanhas').addEventListener('click', e => {
+    const det = e.target.closest('.o-det-campanha');
+    if (det) { abrirDetalheCampanha(det.dataset.kid); return; }
+    const b = e.target.closest('.o-camp-acao'); if (!b) return;
+    if (b.dataset.acao === 'fila') {
+      const r = O.gerarFila(est, b.dataset.kid);
+      guardar(); renderOutreach();
+      toast(r.criados + ' itens colocados em fila (' + r.total + ' no total).', 'success');
+    } else {
+      O.mudarEstadoCampanha(est, b.dataset.kid, b.dataset.acao);
+      guardar(); renderOutreach();
+    }
+  });
+
+  /* fila */
+  $('#oFiltroFila').addEventListener('change', e => { OUT.filtro.fila = e.target.value; OUT.pagina.fila = 1; renderFila(); });
+  $('#oPanel-fila').addEventListener('click', e => {
+    if (e.target.id === 'oFilaPrev') { OUT.pagina.fila--; renderFila(); }
+    if (e.target.id === 'oFilaNext') { OUT.pagina.fila++; renderFila(); }
+  });
+  $('#oBtnSimular').addEventListener('click', simular);
+
+  /* wizard */
+  $('#oCampAnterior').addEventListener('click', () => passoWizard(-1));
+  $('#oCampSeguinte').addEventListener('click', () => passoWizard(1));
+
+  /* fecho dos modais do Outreach */
+  ['#oModalConta', '#oModalTemplate', '#oModalCampanha', '#oModalDetalhe'].forEach(sel => {
+    const m = $(sel);
+    $$(sel + ' [data-close]').forEach(b => b.addEventListener('click', () => closeModal(m)));
+    m.addEventListener('mousedown', e => { if (e.target === e.currentTarget) closeModal(m); });
+  });
+}
+
+function alterarOptOut(valor) {
+  let n = 0;
+  for (const id of OUT.selecao) { if (O.definirOptOut(est, id, valor)) n++; }
+  OUT.selecao.clear();
+  guardar(); renderOutreach();
+  toast(n + (valor ? ' contactos marcados como "não contactar".' : ' contactos reativados.'), 'success');
+}
+
+/* ---------- template ---------- */
+
+function abrirTemplate(t) {
+  OUT.templateEdicao = t;
+  $('#oTplTitle').textContent = t ? 'Editar template' : 'Novo template';
+  $('#oTplNome').value = t ? t.nome : '';
+  $('#oTplMsg').value = t ? t.mensagem : '';
+  $('#oTplVars').innerHTML = O.VARIAVEIS.map(v => '<button type="button" data-v="{{' + v + '}}">{{' + v + '}}</button>').join('');
+  setFieldState($('#oTplNome'), '', { neutral: true });
+  setFieldState($('#oTplMsg'), '', { neutral: true });
+  preverTemplate();
+  openModal($('#oModalTemplate'));
+}
+
+function preverTemplate() {
+  const msg = $('#oTplMsg').value;
+  const amostra = est.contactos.filter(c => c.temInstagram).slice(0, 2);
+  if (!msg.trim()) { $('#oTplPreview').innerHTML = '<div class="o-dim" style="font-size:12.5px">Escreva a mensagem para ver a pré-visualização.</div>'; return; }
+  if (!amostra.length) {
+    const r = O.resolverVariaveis(msg, {});
+    $('#oTplPreview').innerHTML = '<div class="o-bubble out">' + esc(r.texto) + '</div>' +
+      '<div class="o-warn">Sem contactos para pré-visualizar. As variáveis ficam por resolver.</div>';
+    return;
+  }
+  $('#oTplPreview').innerHTML = amostra.map(c => {
+    const r = O.resolverVariaveis(msg, c);
+    return '<div><div class="o-bubble-who">' + esc(c.nome) + ' · @' + esc(c.instagram) + '</div>' +
+      '<div class="o-bubble out">' + esc(r.texto) + '</div>' +
+      (r.faltam.length ? '<div class="o-warn">Sem dados para: ' + esc(r.faltam.join(', ')) + '. Fica por resolver — nada é inventado.</div>' : '') +
+      (r.desconhecidas.length ? '<div class="o-warn">Variáveis desconhecidas: ' + esc(r.desconhecidas.join(', ')) + '.</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
+function submeterTemplate(e) {
+  e.preventDefault();
+  const nome = $('#oTplNome').value.trim();
+  const msg = $('#oTplMsg').value;
+  setFieldState($('#oTplNome'), nome ? '' : 'Indique um nome para o template.');
+  setFieldState($('#oTplMsg'), msg.trim() ? '' : 'A mensagem não pode estar vazia.');
+  if (!nome || !msg.trim()) return;
+  try {
+    if (OUT.templateEdicao) O.editarTemplate(est, OUT.templateEdicao.id, { nome, mensagem: msg });
+    else O.criarTemplate(est, { nome, mensagem: msg });
+    guardar(); closeModal($('#oModalTemplate')); renderOutreach();
+    toast('Template guardado.', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- conta ---------- */
+
+function submeterConta(e) {
+  e.preventDefault();
+  const user = $('#oContaUser').value.trim();
+  setFieldState($('#oContaUser'), user ? '' : 'Indique o nome de utilizador.');
+  if (!user) return;
+  try {
+    O.adicionarConta(est, { username: user, displayName: $('#oContaNome').value.trim() });
+    guardar(); closeModal($('#oModalConta')); renderOutreach();
+    toast('Conta ligada.', 'success');
+  } catch (err) { setFieldState($('#oContaUser'), err.message); }
+}
+
+/* ---------- assistente de campanha ---------- */
+
+function abrirWizard() {
+  if (!est.contas.length) { toast('Ligue primeiro uma conta Instagram.', 'warn', 6000); mostrarAba('contas'); return; }
+  const pre = OUT.selecao.size ? [...OUT.selecao] : est.contactos.filter(c => c.temInstagram).map(c => c.id);
+  OUT.wizard = { passo: 1, nome: '', contactoIds: pre, contaId: est.contas[0].id, templateId: null, mensagem: '' };
+  renderWizard();
+  openModal($('#oModalCampanha'));
+}
+
+const PASSOS = ['Nome', 'Contactos', 'Conta', 'Mensagem', 'Preview', 'Criar'];
+
+function renderWizard() {
+  const w = OUT.wizard;
+  $('#oCampSteps').innerHTML = PASSOS.map((t, i) => {
+    const n = i + 1;
+    const cls = n === w.passo ? 'on' : (n < w.passo ? 'done' : '');
+    return '<span class="o-step ' + cls + '"><span class="o-step-n">' + n + '</span>' + esc(t) + '</span>';
+  }).join('');
+
+  const box = $('#oCampStep');
+  if (w.passo === 1) {
+    box.innerHTML = '<div class="field"><label for="oCampNome">Nome da campanha</label>' +
+      '<input type="text" id="oCampNome" autocomplete="off" placeholder="ex.: Eletricistas Lisboa — 1.º contacto" value="' + esc(w.nome) + '">' +
+      '<small class="ferr" id="err-oCampNome" role="alert" hidden></small></div>';
+    setTimeout(() => $('#oCampNome') && $('#oCampNome').focus(), 30);
+  } else if (w.passo === 2) {
+    const elegiveis = est.contactos.filter(c => c.temInstagram && c.status !== O.CONTACT_STATUS.OPTED_OUT);
+    const mostra = elegiveis.slice(0, 300);
+    box.innerHTML = '<div class="field"><label>Contactos (' + nf(w.contactoIds.length) + ' selecionados de ' + nf(elegiveis.length) + ' elegíveis)</label>' +
+      '<div class="o-picklist" id="oCampLista">' + mostra.map(c =>
+        '<label><input type="checkbox" value="' + esc(c.id) + '"' + (w.contactoIds.includes(c.id) ? ' checked' : '') + '>' +
+        '<span>' + esc(c.nome) + ' <span class="o-dim">@' + esc(c.instagram) + '</span></span></label>').join('') + '</div>' +
+      (elegiveis.length > mostra.length ? '<div class="fhint">A mostrar os primeiros ' + mostra.length + '; os restantes ' + nf(elegiveis.length - mostra.length) + ' continuam selecionados.</div>' : '') +
+      '<div class="fhint">Contactos sem Instagram e marcados como “não contactar” não aparecem aqui.</div></div>';
+    $('#oCampLista').addEventListener('change', e => {
+      const v = e.target.value;
+      if (e.target.checked) { if (!w.contactoIds.includes(v)) w.contactoIds.push(v); }
+      else w.contactoIds = w.contactoIds.filter(x => x !== v);
+    });
+  } else if (w.passo === 3) {
+    box.innerHTML = '<div class="field"><label for="oCampConta">Conta Instagram</label>' +
+      '<select class="tsel" id="oCampConta" style="width:100%">' + est.contas.map(c =>
+        '<option value="' + esc(c.id) + '"' + (c.id === w.contaId ? ' selected' : '') + '>@' + esc(c.username) + ' · ' + esc(c.provider) + '</option>').join('') +
+      '</select></div>';
+    $('#oCampConta').addEventListener('change', e => { w.contaId = e.target.value; });
+  } else if (w.passo === 4) {
+    box.innerHTML = '<div class="field"><label for="oCampTpl">Template</label>' +
+      '<select class="tsel" id="oCampTpl" style="width:100%"><option value="">Escrever mensagem própria</option>' +
+      est.templates.map(t => '<option value="' + esc(t.id) + '"' + (t.id === w.templateId ? ' selected' : '') + '>' + esc(t.nome) + '</option>').join('') +
+      '</select></div>' +
+      '<div class="field"><label for="oCampMsg">Mensagem</label><textarea id="oCampMsg" rows="5">' + esc(w.mensagem) + '</textarea>' +
+      '<small class="ferr" id="err-oCampMsg" role="alert" hidden></small>' +
+      '<div class="o-vars">' + O.VARIAVEIS.map(v => '<button type="button" data-v="{{' + v + '}}">{{' + v + '}}</button>').join('') + '</div></div>';
+    const sincronizar = () => {
+      const t = est.templates.find(x => x.id === $('#oCampTpl').value);
+      if (t) { $('#oCampMsg').value = t.mensagem; w.mensagem = t.mensagem; w.templateId = t.id; }
+      else w.templateId = null;
+    };
+    $('#oCampTpl').addEventListener('change', sincronizar);
+    $('#oCampMsg').addEventListener('input', e => { w.mensagem = e.target.value; w.templateId = null; });
+    box.querySelector('.o-vars').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const ta = $('#oCampMsg'); ta.value += b.dataset.v; w.mensagem = ta.value; ta.focus();
+    });
+  } else if (w.passo === 5) {
+    const v = O.validarCampanha(est, w);
+    /* preview com contactos REAIS da seleção — nunca exemplos inventados */
+    const amostra = v.incluidos.slice(0, 3);
+    box.innerHTML =
+      (v.excluidos.length ? '<div class="o-warn" style="margin-bottom:12px">' + nf(v.excluidos.length) + ' contactos excluídos: ' +
+        esc(resumoExclusoes(v.excluidos)) + '.</div>' : '') +
+      '<div class="field"><label>Pré-visualização com ' + amostra.length + ' contactos reais desta seleção</label>' +
+      '<div class="o-preview">' + (amostra.length ? amostra.map(c => {
+        const r = O.resolverVariaveis(w.mensagem, c);
+        return '<div><div class="o-bubble-who">' + esc(c.nome) + ' · @' + esc(c.instagram) + '</div>' +
+          '<div class="o-bubble out">' + esc(r.texto) + '</div>' +
+          (r.faltam.length ? '<div class="o-warn">Sem dados para: ' + esc(r.faltam.join(', ')) + '.</div>' : '') + '</div>';
+      }).join('') : '<div class="o-dim">Nenhum contacto elegível.</div>') + '</div></div>' +
+      (v.erros.length ? '<div class="o-warn" style="margin-top:12px">' + esc(v.erros.join(' ')) + '</div>' : '');
+  } else {
+    const v = O.validarCampanha(est, w);
+    box.innerHTML = '<div class="o-empty"><h3>' + (v.valido ? 'Pronta a criar' : 'Faltam dados') + '</h3>' +
+      '<p>' + (v.valido
+        ? nf(v.incluidos.length) + ' contactos vão entrar nesta campanha, com a conta @' +
+          esc((est.contas.find(c => c.id === w.contaId) || {}).username || '') + '.'
+        : esc(v.erros.join(' '))) + '</p></div>';
+  }
+
+  $('#oCampAnterior').disabled = w.passo === 1;
+  $('#oCampSeguinte').textContent = w.passo === PASSOS.length ? 'Criar campanha' : 'Seguinte';
+  $('#oCampNota').textContent = 'Passo ' + w.passo + ' de ' + PASSOS.length;
+}
+
+function resumoExclusoes(excluidos) {
+  const c = {};
+  for (const x of excluidos) c[x.motivo] = (c[x.motivo] || 0) + 1;
+  const rot = { SEM_INSTAGRAM: 'sem Instagram', OPTED_OUT: 'não contactar', NOT_ELIGIBLE: 'não elegíveis' };
+  return Object.entries(c).map(([m, n]) => n + ' ' + (rot[m] || m)).join(', ');
+}
+
+function passoWizard(delta) {
+  const w = OUT.wizard;
+  if (delta > 0) {
+    if (w.passo === 1) {
+      w.nome = ($('#oCampNome') || {}).value ? $('#oCampNome').value.trim() : w.nome;
+      if (!w.nome) { setFieldState($('#oCampNome'), 'Indique um nome para a campanha.'); return; }
+    }
+    if (w.passo === 2 && !w.contactoIds.length) { toast('Escolha pelo menos um contacto.', 'warn'); return; }
+    if (w.passo === 4) {
+      if ($('#oCampMsg')) w.mensagem = $('#oCampMsg').value;
+      if (!w.mensagem.trim()) { setFieldState($('#oCampMsg'), 'A mensagem não pode estar vazia.'); return; }
+    }
+    if (w.passo === PASSOS.length) { criarCampanhaWizard(); return; }
+  }
+  w.passo = Math.min(PASSOS.length, Math.max(1, w.passo + delta));
+  renderWizard();
+}
+
+function criarCampanhaWizard() {
+  try {
+    const k = O.criarCampanha(est, OUT.wizard);
+    O.gerarFila(est, k.id);
+    guardar();
+    closeModal($('#oModalCampanha'));
+    OUT.selecao.clear();
+    mostrarAba('campanhas');
+    let msg = 'Campanha criada com ' + k.contactoIds.length + ' contactos';
+    if (k.excluidos.length) msg += ' · ' + k.excluidos.length + ' excluídos (' + resumoExclusoes(k.excluidos) + ')';
+    toast(msg, 'success', 7000);
+  } catch (err) { toast(err.message, 'error', 7000); }
+}
+
+/* ---------- simulação ---------- */
+
+async function simular() {
+  const alvo = OUT.filtro.fila
+    ? [est.campanhas.find(k => k.id === OUT.filtro.fila)].filter(Boolean)
+    : est.campanhas.filter(k => est.fila.some(i => i.campanhaId === k.id && i.status === O.QUEUE_STATUS.PENDING));
+  if (!alvo.length) { toast('Não há itens pendentes.', 'info'); return; }
+
+  $('#oBtnSimular').disabled = true;
+  const total = { enviados: 0, falhas: 0, respostas: 0, limitados: 0 };
+  for (const k of alvo) {
+    try {
+      const r = await O.simularProcessamento(est, k.id, { provider: mockProvider });
+      total.enviados += r.enviados; total.falhas += r.falhas;
+      total.respostas += r.respostas; total.limitados += r.limitados;
+    } catch (err) { toast('“' + k.nome + '”: ' + err.message, 'warn'); }
+  }
+  guardar(); renderOutreach();
+  toast('SIMULAÇÃO — ' + total.enviados + ' enviados, ' + total.respostas + ' respostas, ' +
+    total.falhas + ' falhas, ' + total.limitados + ' adiados por limite. Nenhuma mensagem real foi enviada.',
+    'success', 8000);
+}
+
+/* ---------- detalhes ---------- */
+
+function abrirDetalheContacto(id) {
+  const c = contactoPorId(id);
+  if (!c) return;
+  const msgs = est.mensagens.filter(m => m.contactoId === id);
+  const linha = (r, v) => '<dt>' + esc(r) + '</dt><dd>' + (v || '<span class="o-dim">—</span>') + '</dd>';
+  $('#oDetTitle').textContent = c.nome;
+  $('#oDetBody').innerHTML =
+    '<dl class="o-dl">' +
+      linha('Instagram', c.temInstagram
+        ? '<a href="https://instagram.com/' + esc(c.instagram) + '" target="_blank" rel="noopener noreferrer">@' + esc(c.instagram) + '</a>'
+        : marca('SEM INSTAGRAM', 'OPTED_OUT')) +
+      linha('Estado', marca(c.status, c.status)) +
+      linha('Atividade', esc(c.atividade || '')) +
+      linha('Localização', esc([c.cidade, c.concelho, c.distrito].filter(Boolean).join(' · '))) +
+      linha('Website', c.website ? '<a href="' + esc(c.website) + '" target="_blank" rel="noopener noreferrer">' + esc(c.website) + '</a>' : '') +
+      linha('Telefone', esc(c.telefone || '')) +
+      linha('Email', esc(c.email || '')) +
+      linha('Origem', esc(c.origem || '')) +
+      linha('Adicionado em', esc((c.adicionadoEm || '').slice(0, 10))) +
+      linha('Campanhas', c.campanhas.length ? esc(c.campanhas.map(nomeCampanha).join(', ')) : '') +
+    '</dl>' +
+    '<div class="field" style="margin-top:14px"><label>Mensagens</label>' +
+    (msgs.length
+      ? '<div class="o-preview">' + msgs.map(m =>
+          '<div><div class="o-bubble-who">' + (m.direcao === 'saida' ? 'Enviada' : 'Resposta') + ' · ' + esc((m.em || '').slice(0, 16).replace('T', ' ')) + '</div>' +
+          '<div class="o-bubble' + (m.direcao === 'saida' ? ' out' : '') + '">' + esc(m.texto) + '</div></div>').join('') + '</div>'
+      : '<div class="o-dim" style="font-size:12.5px">Sem mensagens.</div>') + '</div>';
+  $('#oDetNota').textContent = '';
+  openModal($('#oModalDetalhe'));
+}
+
+function abrirDetalheCampanha(id) {
+  const k = est.campanhas.find(x => x.id === id);
+  if (!k) return;
+  const kp = O.kpisCampanha(est, id);
+  const tpl = est.templates.find(t => t.id === k.templateId);
+  const itens = est.fila.filter(i => i.campanhaId === id).slice(0, 200);
+  $('#oDetTitle').textContent = k.nome;
+  $('#oDetBody').innerHTML =
+    '<dl class="o-dl">' +
+      '<dt>Conta</dt><dd>' + esc(nomeConta(k.contaId)) + '</dd>' +
+      '<dt>Provider</dt><dd>' + esc(k.provider) + '</dd>' +
+      '<dt>Template</dt><dd>' + esc(tpl ? tpl.nome : 'mensagem própria') + '</dd>' +
+      '<dt>Estado</dt><dd>' + marca(k.status, k.status) + '</dd>' +
+    '</dl>' +
+    '<section class="kpis" style="margin:14px 0">' +
+      ['Total|' + kp.total, 'Pendentes|' + kp.pendentes, 'Enviados|' + kp.enviados, 'Falhas|' + kp.falhas, 'Respostas|' + kp.respostas]
+        .map(x => { const [l, v] = x.split('|'); return '<div class="kpi"><span class="kpi-v">' + nf(v) + '</span><span class="kpi-l">' + l + '</span></div>'; }).join('') +
+    '</section>' +
+    '<div class="o-table-wrap"><table class="o-table"><thead><tr><th>Contacto</th><th>Instagram</th><th>Estado</th><th>Erro</th></tr></thead><tbody>' +
+    itens.map(i => { const c = contactoPorId(i.contactoId);
+      return '<tr><td>' + esc(c ? c.nome : '—') + '</td><td>@' + esc(i.instagram || '') + '</td><td>' +
+        marca(i.status, i.status) + '</td><td class="o-dim">' + esc(i.erro || '—') + '</td></tr>'; }).join('') +
+    '</tbody></table></div>' +
+    (est.fila.filter(i => i.campanhaId === id).length > 200 ? '<div class="fhint">A mostrar os primeiros 200 itens.</div>' : '');
+  $('#oDetNota').textContent = '';
+  openModal($('#oModalDetalhe'));
+}
+
+/* ---------- arranque ---------- */
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciarOutreach);
+else iniciarOutreach();
+
+/* superfície para os testes de interface */
+window.__outreach = {
+  estado: () => est,
+  render: renderOutreach,
+  mostrarAba, mostrarVista,
+  adicionar: adicionarSelecionadosAoOutreach,
+  provider: () => mockProvider,
+  store: () => store,
+  modelo: () => O
+};
+</script>
+
+<script type="module">
+/* =====================================================================
+   31. HISTÓRICO DE LISTAS E CAPTURAS (v1.0.1)
+   ---------------------------------------------------------------------
+   Liga o registo histórico ao fluxo de pesquisa já existente, através de
+   um gancho opcional: se estes módulos não carregarem, a aplicação
+   continua a funcionar exatamente como antes, apenas sem histórico.
+
+   Snapshots em IndexedDB (medidos ~835 bytes por lead: 3000 leads =
+   2,4 MB, acima do que o localStorage aguenta em várias listas).
+   ===================================================================== */
+
+let H = null;              /* modelo do histórico */
+let histStore = null;
+let indice = null;         /* IndiceCapturas — lookup O(1) */
+let listas = [];
+
+async function iniciarHistorico() {
+  try {
+    H = await import('./providers/history/model.mjs');
+    const S = await import('./providers/history/store.mjs');
+    histStore = new S.LocalLeadHistoryStore();
+    await histStore.iniciar();
+    indice = new H.IndiceCapturas(await histStore.carregarRegisto());
+    listas = await histStore.listarPesquisas();
+
+    /* gancho consumido pelo runSearch: classifica as leads desta
+       execução contra o registo tal como estava ANTES desta pesquisa */
+    window.__historico = {
+      classificar(leads, contexto) {
+        if (!indice) return null;
+        const searchId = 'p-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e6).toString(36);
+        const r = H.classificarLeads(leads, indice, { searchId });
+        return { ...r, searchId, contexto };
+      },
+      async registar(resultado, meta) {
+        if (!histStore || !resultado) return null;
+        indice.carregar(resultado.linhas);
+        await histStore.guardarRegistos(resultado.linhas);
+        const historyId = 'h-' + resultado.searchId;
+        const registo = H.registoDePesquisa({
+          ...meta, historyId, searchId: resultado.searchId,
+          novas: resultado.novas, jaCapturadas: resultado.jaCapturadas, leads: resultado.leads
+        });
+        try {
+          await histStore.guardarPesquisa(registo);
+          await histStore.guardarSnapshot(historyId, resultado.leads);
+        } catch (err) {
+          /* §33: nunca descartar uma geração em silêncio */
+          toast('Não foi possível guardar esta lista no histórico: ' + (err.message || err) +
+            '. Os resultados no ecrã mantêm-se, mas não ficam disponíveis depois de recarregar.', 'error', 10000);
+          throw err;
+        }
+        listas = await histStore.listarPesquisas();
+        renderListas();
+        return registo;
+      },
+      disponivel: true
+    };
+
+    ligarEventosHistorico();
+    renderListas();
+    if (histStore.avisoPersistencia) {
+      $('#listasAviso').textContent = histStore.avisoPersistencia;
+    }
+  } catch (err) {
+    console.warn('[Histórico] indisponível', err);
+    window.__historico = { disponivel: false, classificar: () => null, registar: async () => null };
+    const sec = $('#listasSection');
+    if (sec) sec.hidden = true;
+  }
+}
+
+/* ---------- lista de listas ---------- */
+
+function renderListas() {
+  const sec = $('#listasSection');
+  if (!sec) return;
+  sec.hidden = listas.length === 0;
+  $('#listasCount').textContent = Number(listas.length).toLocaleString('pt-PT');
+  const n = v => Number(v || 0).toLocaleString('pt-PT');
+
+  $('#listasBody').innerHTML = listas.map(l => {
+    const quando = l.criadaEm ? new Date(l.criadaEm) : null;
+    const meta = [
+      quando ? fmtDateTime(quando) : null,
+      l.modo === 'portugal' ? 'Portugal' : (l.localizacao || null),
+      l.modo === 'portugal' ? null : (l.raioKm ? 'raio ' + l.raioKm + ' km' : null),
+      (l.fontes && l.fontes.length) ? l.fontes.join(' + ') : null
+    ].filter(Boolean).join(' · ');
+    return '<div class="hist-row" data-lid="' + esc(l.id) + '">' +
+      '<span class="hist-main"><b>' + esc(l.nome) + '</b><span class="hist-meta">' + esc(meta) + '</span></span>' +
+      '<span class="hist-nums">' +
+        '<span><b>' + n(l.totalFinal) + '</b><i>leads</i></span>' +
+        '<span><b>' + n(l.novas) + '</b><i>novas</i></span>' +
+        '<span><b>' + n(l.jaCapturadas) + '</b><i>já capturadas</i></span>' +
+        '<span><b>' + n(l.comEmail) + '</b><i>email</i></span>' +
+        '<span><b>' + n(l.comTelefone) + '</b><i>telefone</i></span>' +
+      '</span>' +
+      '<span class="hist-acoes">' +
+        '<button class="btn btn-sm" type="button" data-hist="preview" aria-label="Pré-visualizar ' + esc(l.nome) + '">Preview</button>' +
+        '<button class="btn btn-sm" type="button" data-hist="repetir" aria-label="Repetir ' + esc(l.nome) + '">Repetir</button>' +
+        '<button class="btn btn-sm" type="button" data-hist="xlsx" aria-label="Baixar ' + esc(l.nome) + '">Baixar</button>' +
+        '<button class="btn btn-sm" type="button" data-hist="apagar" aria-label="Apagar ' + esc(l.nome) + '">Apagar</button>' +
+      '</span></div>';
+  }).join('');
+}
+
+function ligarEventosHistorico() {
+  $('#listasBody').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-hist]');
+    if (!b) return;
+    const id = b.closest('.hist-row').dataset.lid;
+    const meta = listas.find(l => l.id === id);
+    if (!meta) return;
+    if (b.dataset.hist === 'preview') await abrirPreview(meta);
+    else if (b.dataset.hist === 'repetir') repetirGeracao(meta);
+    else if (b.dataset.hist === 'xlsx') await baixarLista(meta);
+    else if (b.dataset.hist === 'apagar') await apagarLista(meta);
+  });
+
+  /* Preview: filtro, paginação e as ações do rodapé */
+  $('#prevFiltro').addEventListener('change', e => {
+    previewAtual.filtro = e.target.value; previewAtual.pagina = 1; renderPreview();
+  });
+  $('#prevPager').addEventListener('click', e => {
+    if (e.target.id === 'prevPrev') { previewAtual.pagina--; renderPreview(); }
+    if (e.target.id === 'prevNext') { previewAtual.pagina++; renderPreview(); }
+  });
+  $('#prevAbrirCompleta').addEventListener('click', async () => {
+    const meta = previewAtual.meta;
+    closeModal($('#modalPreview'));
+    await abrirLista(meta);
+  });
+  $('#prevBaixar').addEventListener('click', () => baixarLista(previewAtual.meta));
+  $('#prevRepetir').addEventListener('click', () => repetirGeracao(previewAtual.meta));
+  const mp = $('#modalPreview');
+  $$('#modalPreview [data-close]').forEach(b2 => b2.addEventListener('click', () => closeModal(mp)));
+  mp.addEventListener('mousedown', e => { if (e.target === e.currentTarget) closeModal(mp); });
+
+  $('#btnLimparRegisto').addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: 'Limpar histórico de leads',
+      msg: 'Isto apagará o histórico usado para identificar leads já capturadas. ' +
+        'Todas as leads voltarão a aparecer como novas nas próximas pesquisas. As listas guardadas não são afetadas.',
+      okLabel: 'Limpar histórico'
+    });
+    if (!ok) return;
+    await histStore.limparRegistoGlobal();
+    indice = new H.IndiceCapturas();
+    toast('Histórico de leads limpo. As listas guardadas mantêm-se.', 'success', 6000);
+  });
+}
+
+/* ---------- abrir, exportar, renomear, apagar ---------- */
+
+let previewAtual = null;
+const PREV_POR_PAGINA = 50;
+
+/* Preview: abre o snapshot guardado. Não refaz pesquisa, não chama a
+   Google, o OSM nem o enriquecimento — só lê o que já foi guardado. */
+async function abrirPreview(meta) {
+  const leads = await histStore.lerSnapshot(meta.historyId || meta.id);
+  if (!leads) { toast('Snapshot indisponível para esta lista.', 'error', 6000); return; }
+  previewAtual = { meta, leads, filtro: '', pagina: 1 };
+  $('#prevTitle').textContent = meta.nome;
+  renderPreview();
+  openModal($('#modalPreview'));
+}
+
+function previewFiltradas() {
+  const { leads, filtro } = previewAtual;
+  const tem = v => v && v !== ND;
+  return leads.filter(l => {
+    if (!filtro) return true;
+    if (filtro === 'email') return (l.emails && l.emails.length) || tem(l.email);
+    if (filtro === 'instagram') return tem(l.instagram);
+    return l.historico && l.historico.estado === filtro;
+  });
+}
+
+function renderPreview() {
+  const { meta, leads } = previewAtual;
+  const n = v => Number(v || 0).toLocaleString('pt-PT');
+
+  $('#prevCabecalho').innerHTML = '<div class="prev-cab">' + [
+    ['Data', meta.criadaEm ? fmtDateTime(new Date(meta.criadaEm)) : ND],
+    ['Pesquisa', meta.query || ND],
+    ['Localização', meta.modo === 'portugal' ? 'Portugal continental' : (meta.localizacao || ND)],
+    [meta.modo === 'portugal' ? 'Modo' : 'Raio', meta.modo === 'portugal' ? 'Portugal' : (meta.raioKm ? meta.raioKm + ' km' : ND)],
+    ['Fontes', (meta.fontes && meta.fontes.length) ? meta.fontes.join(' + ') : ND]
+  ].map(([r, v]) => '<span>' + r + ': <b>' + esc(v) + '</b></span>').join('') + '</div>';
+
+  const kp = [
+    ['Total', meta.totalFinal], ['Novas', meta.novas], ['Já captadas', meta.jaCapturadas],
+    ['Com email', meta.comEmail], ['Com telefone', meta.comTelefone],
+    ['Com website', meta.comWebsite], ['Com Instagram', meta.comInstagram]
+  ];
+  $('#prevKpis').innerHTML = kp.map(([r, v]) =>
+    '<div class="kpi"><span class="kpi-v">' + n(v) + '</span><span class="kpi-l">' + r + '</span></div>').join('');
+
+  const lista = previewFiltradas();
+  const totalPag = Math.max(1, Math.ceil(lista.length / PREV_POR_PAGINA));
+  if (previewAtual.pagina > totalPag) previewAtual.pagina = totalPag;
+  const ini = (previewAtual.pagina - 1) * PREV_POR_PAGINA;
+  const pagina = lista.slice(ini, ini + PREV_POR_PAGINA);
+
+  const cel = v => (v && v !== ND) ? esc(v) : '<span class="o-dim">' + ND + '</span>';
+  $('#prevTabela').innerHTML =
+    '<thead><tr><th>Empresa / Profissional</th><th>Atividade</th><th>Cidade</th><th>Telefone</th>' +
+    '<th>Email</th><th>Website</th><th>Instagram</th><th>Histórico</th></tr></thead><tbody>' +
+    pagina.map(l => '<tr>' +
+      '<td>' + esc(l.nome) + '</td>' +
+      '<td class="o-dim">' + cel((l.searchQueries && l.searchQueries[0]) || l.segmento) + '</td>' +
+      '<td class="o-dim">' + cel(l.localidade) + '</td>' +
+      '<td class="o-nowrap">' + cel(l.telefone !== ND ? l.telefone : l.telemovel) + '</td>' +
+      '<td>' + ((l.emails && l.emails.length) ? esc(l.emails[0].email) : '<span class="o-dim">' + ND + '</span>') + '</td>' +
+      '<td>' + (l.website && l.website !== ND ? esc(hostOf(l.website) || l.website) : '<span class="o-dim">' + ND + '</span>') + '</td>' +
+      '<td class="o-nowrap">' + cel(l.instagram) + '</td>' +
+      '<td class="o-nowrap">' + histCell(l) + '</td>' +
+      '</tr>').join('') + '</tbody>';
+
+  $('#prevContagem').textContent = n(lista.length) + (lista.length === leads.length ? ' leads' : ' de ' + n(leads.length));
+  $('#prevPager').innerHTML = totalPag > 1
+    ? '<span>Página ' + previewAtual.pagina + ' de ' + totalPag + '</span><div class="o-spacer"></div>' +
+      '<button class="btn btn-sm" type="button" id="prevPrev"' + (previewAtual.pagina === 1 ? ' disabled' : '') + '>Anterior</button>' +
+      '<button class="btn btn-sm" type="button" id="prevNext"' + (previewAtual.pagina === totalPag ? ' disabled' : '') + '>Seguinte</button>'
+    : '<span>' + n(lista.length) + ' leads</span>';
+  $('#prevNota').textContent = 'Resultados guardados em ' + (meta.criadaEm ? fmtDateTime(new Date(meta.criadaEm)) : '');
+}
+
+/**
+ * Repetir: recupera os parâmetros e executa uma pesquisa NOVA. A geração
+ * anterior fica intacta; esta produz searchId, historyId e snapshot novos.
+ */
+function repetirGeracao(meta) {
+  if (state.loading) { toast('Aguarde a pesquisa em curso.', 'info'); return; }
+  closeModal($('#modalPreview'));
+  /* `definirModo` é interno ao script clássico: usa-se o botão, que é o
+     caminho público e mantém o estado e o UI sincronizados. */
+  const alvo = meta.modo === 'portugal' ? '#modoPortugal' : '#modoLocal';
+  const btn = $(alvo);
+  if (btn && btn.getAttribute('aria-pressed') !== 'true') btn.click();
+  const lat = Number.isFinite(meta.lat) ? meta.lat : state.center.lat;
+  const lon = Number.isFinite(meta.lon) ? meta.lon : state.center.lon;
+  runSearch({
+    lat, lon, label: meta.localizacao || state.center.label,
+    needsGeocode: false,
+    radiusKm: meta.modo === 'portugal' ? state.radiusKm : (meta.raioKm || state.radiusKm),
+    nicheKeys: [], keyword: meta.query || '', demo: false
+  });
+  toast('A repetir "' + meta.nome + '" — vai ser criada uma nova geração.', 'info', 5000);
+}
+
+async function abrirLista(meta) {
+  const leads = await histStore.lerSnapshot(meta.historyId || meta.id);
+  if (!leads) { toast('Snapshot indisponível para esta lista.', 'error', 6000); return; }
+  /* mostra exatamente o que foi obtido nessa execução — não repete a pesquisa */
+  state.leads = leads;
+  state.selected.clear();
+  state.filters = { ...state.filters, text: '', distrito: '', concelho: '', tipo: '', historico: '' };
+  state.hasSearched = true;
+  state.searchId = meta.id;
+  state.searchMeta = { ...state.searchMeta, keyword: meta.query || '', dateStr: fmtDateTime(new Date(meta.criadaEm || Date.now())) };
+  if (meta.raioKm) state.radiusKm = meta.raioKm;
+  $('#tableFilter').value = '';
+  $('#filtroHistorico').value = '';
+  renderAll();
+  try { MapP().fitRadius(); } catch (e) { /* o mapa pode não ter centro desta lista */ }
+  window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  toast('Lista "' + meta.nome + '" aberta — ' + leads.length + ' leads guardadas em ' + fmtDateTime(new Date(meta.criadaEm)) + '.', 'success', 6000);
+}
+
+async function baixarLista(meta) {
+  const leads = await histStore.lerSnapshot(meta.historyId || meta.id);
+  if (!leads) { toast('Snapshot indisponível para esta lista.', 'error', 6000); return; }
+  try {
+    await ensureXlsx();
+    const wb = buildWorkbook(leads);
+    const nome = meta.nome.replace(/[\\/:*?"<>|]/g, '-').slice(0, 80);
+    XLSX.writeFile(wb, nome + '.xlsx');
+    toast(leads.length + ' leads exportadas de "' + meta.nome + '".', 'success');
+  } catch (err) {
+    toast('Não foi possível exportar: ' + (err.message || err), 'error', 6000);
+  }
+}
+
+async function renomearLista(meta) {
+  const novo = prompt('Nome da lista:', meta.nome);
+  if (novo == null) return;
+  try {
+    const atualizado = H.renomear(meta, novo);
+    await histStore.guardarPesquisa(atualizado);
+    listas = await histStore.listarPesquisas();
+    renderListas();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function apagarLista(meta) {
+  const ok = await confirmDialog({
+    title: 'Apagar lista',
+    msg: 'Apagar esta lista do histórico? O snapshot desta geração será removido. ' +
+      'O registo global de leads já captadas não será apagado.',
+    okLabel: 'Apagar lista'
+  });
+  if (!ok) return;
+  await histStore.apagarPesquisa(meta.historyId || meta.id);
+  listas = await histStore.listarPesquisas();
+  renderListas();
+  toast('Lista apagada.', 'success');
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciarHistorico);
+else iniciarHistorico();
+
+window.__historicoUI = { listas: () => listas, indice: () => indice, store: () => histStore, render: renderListas };
 </script>
 </body>
 </html>
