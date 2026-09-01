@@ -48,9 +48,24 @@ variáveis de ambiente do backend.
 | `providers/outreach/worker.mjs` | Worker: claim → envio → persistência |
 | `providers/outreach/auth.mjs` | Sessão assinada, hash de password, guardas |
 | `providers/outreach/http.mjs` | Plumbing das rotas: método, auth, erros |
+| `providers/outreach/routes.mjs` | Os oito handlers + tabela de despacho |
+| `api/outreach/[...rota].js` | **Única** Serverless Function do Outreach |
 | `providers/outreach/remote-store.mjs` | `RemoteOutreachStore` para a UI |
 | `providers/outreach/migrate-local.mjs` | Migração local → remoto |
 | `migrations/*.sql` | Esquema, índices e funções transacionais |
+
+### Uma função, oito endpoints
+
+Cada ficheiro em `api/` é uma Serverless Function, e o plano tem um teto
+de doze por deployment. Oito ficheiros de outreach levavam o projeto a
+catorze funções e o build falhava **por inteiro** — nem as funções
+antigas nem os ficheiros estáticos chegavam a produção, o que se
+manifesta como um deployment que simplesmente não substitui o anterior.
+
+Os handlers passaram para `routes.mjs` sem alteração de lógica e
+`api/outreach/[...rota].js` escolhe qual chamar pelo nome da rota. São
+sete funções no total e **os URLs públicos não mudaram**. Um nome
+desconhecido devolve 404 no mesmo formato das outras respostas.
 
 ---
 
