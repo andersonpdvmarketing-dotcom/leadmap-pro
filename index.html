@@ -3901,9 +3901,54 @@ async function abrirConfiguracoes() {
   await cfgCarregar();
 }
 
+/**
+ * Estado da sessão do Outreach, lido de `/api/outreach/session` — a rota
+ * pública que existe exatamente para isto. O objeto `sessao` do gate vive
+ * noutro bloco de script e não é alcançável daqui.
+ */
+async function cfgSessao() {
+  try {
+    const r = await fetch('/api/outreach/session', { credentials: 'same-origin' });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j) return { erro: true };
+    return { configurada: j.configured === true, autenticado: j.authenticated === true };
+  } catch (e) { return { erro: true }; }
+}
+
+/** Cartão simples para os casos em que não há nada que mostrar. */
+function cfgAviso(titulo, texto, luz = '') {
+  return '<div class="cfg-card"><div class="cfg-topo">' +
+    '<span class="cfg-luz ' + luz + '"></span><span class="cfg-nome">' + esc(titulo) + '</span>' +
+    '</div><p class="cfg-desc">' + esc(texto) + '</p></div>';
+}
+
 async function cfgCarregar() {
   const lista = $('#cfgLista');
   lista.innerHTML = '<p class="cfg-nota">A consultar o backend…</p>';
+
+  /* O estado das integrações é privado. Sem sessão nem se pede: um 401
+     visível aqui seria ruído, e o que a pessoa precisa de saber é que
+     falta entrar no Outreach. */
+  const s = await cfgSessao();
+  CFG.integracoes = [];
+  $('#cfgAmbiente').textContent = '';
+  if (s.erro) {
+    lista.innerHTML = cfgAviso('Backend indisponível',
+      'Não foi possível falar com o servidor para saber se há sessão aberta.', 'erro');
+    return;
+  }
+  if (!s.configurada) {
+    lista.innerHTML = cfgAviso('Outreach ainda não configurado',
+      'O backend não tem autenticação configurada, por isso o estado das integrações não pode ser consultado. ' +
+      'As variáveis de ambiente definem-se no painel da Vercel.');
+    return;
+  }
+  if (!s.autenticado) {
+    lista.innerHTML = cfgAviso('Sessão necessária',
+      'O estado das integrações é privado. Entre no Outreach para o consultar.');
+    return;
+  }
+
   try {
     const r = await cfgPedir('integrations');
     CFG.integracoes = r.integracoes || [];
@@ -3915,9 +3960,10 @@ async function cfgCarregar() {
   } catch (err) {
     /* §14: sem backend a página continua a funcionar e diz o que sabe */
     CFG.integracoes = [];
-    lista.innerHTML = '<div class="cfg-card"><div class="cfg-topo">' +
-      '<span class="cfg-luz erro"></span><span class="cfg-nome">Backend indisponível</span></div>' +
-      '<p class="cfg-desc">' + esc(err.message) + '</p></div>';
+    /* a sessão pode ter expirado entre a verificação e este pedido */
+    lista.innerHTML = (err.status === 401 || err.status === 403)
+      ? cfgAviso('Sessão necessária', 'A sessão do Outreach expirou. Entre outra vez para consultar o estado das integrações.')
+      : cfgAviso('Backend indisponível', err.message, 'erro');
     return;
   }
   cfgRender();

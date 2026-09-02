@@ -15,7 +15,7 @@
 
 import { rota, corpoDe, idDoPedido, responderErro, construirRepositorio, semCache } from './http.mjs';
 import {
-  autenticarOperador, cookieDeSessao, cookieDeLogout, exigirSessao,
+  autenticarOperador, cookieDeSessao, cookieDeLogout, exigirSessao, exigirPapel,
   authConfigurada, exigirSegredoDoWorker, AuthError, exigirMesmaOrigem,
   origemDoPedido, exigirTentativaDisponivel, registarFalha, limparTentativas
 } from './auth.mjs';
@@ -820,10 +820,22 @@ export const dbProbe = rota({
  * variáveis; nunca um valor, nem sequer truncado ou mascarado. Um
  * prefixo de token é um token parcialmente vazado.
  *
- * Sem sessão exigida, à semelhança de `GET /session`: sem isto não haveria
- * como ver o que falta configurar antes de a autenticação estar
- * configurada — e o que se revela é apenas se uma variável está ou não
- * definida, o que quem opera a aplicação já sabe.
+ * EXIGE SESSÃO
+ * ------------
+ * Esta rota já esteve aberta, com o argumento de que era preciso ver o
+ * que falta configurar antes de a autenticação existir. O argumento não
+ * se sustinha: as variáveis definem-se no painel da Vercel, não aqui.
+ * Aberta, dizia a qualquer visitante quais integrações o negócio tem
+ * ligadas e quais lhe faltam — um mapa de superfície que não tem de ser
+ * público, mesmo sem um único valor lá dentro.
+ *
+ * NÃO USA `rota()`
+ * ----------------
+ * `rota()` exige também base de dados, e esta leitura não toca em
+ * nenhuma. Exigi-la transformaria "o que falta configurar?" em 503
+ * exatamente quando a base ainda falta — que é quando a pergunta
+ * interessa. Segue-se o mesmo desenho de `GET /session`: autentica-se
+ * com as mesmas primitivas, e tolera-se a ausência de repositório.
  */
 export async function integrations(req, res) {
   const requestId = idDoPedido(req);
@@ -833,6 +845,13 @@ export async function integrations(req, res) {
     if (req.method !== 'GET') {
       return res.status(405).json({ success: false, errorCode: 'METHOD_NOT_ALLOWED', requestId });
     }
+    exigirMesmaOrigem(req);                       /* 403 CSRF */
+    if (!authConfigurada(env)) {
+      throw new AuthError(503, 'NOT_CONFIGURED', 'Autenticação do Outreach não configurada no backend.');
+    }
+    const sessao = exigirSessao(req, env);        /* 401 */
+    exigirPapel(sessao, 'outreach:operator');     /* 403 */
+
     const itens = INTEGRACOES.map(i => {
       const emFalta = i.envs.filter(n => !env[n]);
       return {

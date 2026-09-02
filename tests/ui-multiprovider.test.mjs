@@ -138,14 +138,16 @@ test('UI: o cartão tem botão de editar, para poder trocar o provider', () => {
  * Configurações → Integrações                                       *
  * ================================================================ */
 
+/* `integrations` é privada: estes testes olham para o conteúdo dos
+   cartões, e o conteúdo só existe depois de autenticar. */
 test('CARDS: Meta e External aparecem, além dos anteriores', async () => {
-  const r = await chamar('integrations', { autenticado: false });
+  const r = await chamar('integrations', { autenticado: true });
   const ids = r.corpo.integracoes.map(i => i.id);
   for (const id of ['meta', 'manychat', 'external']) assert.ok(ids.includes(id), 'falta o card ' + id);
 });
 
 test('CARDS: Meta não configurado diz exatamente o que falta', async () => {
-  const r = await chamar('integrations', { autenticado: false });
+  const r = await chamar('integrations', { autenticado: true });
   const meta = r.corpo.integracoes.find(i => i.id === 'meta');
   assert.equal(meta.configurada, false);
   assert.deepEqual(meta.emFalta, ['INSTAGRAM_META_ACCESS_TOKEN']);
