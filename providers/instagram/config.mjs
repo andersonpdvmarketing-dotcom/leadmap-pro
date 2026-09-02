@@ -16,6 +16,9 @@
  *                                    adapter da Meta — só depois de validar
  *                                    os endpoints na documentação oficial
  *
+ *   MANYCHAT_API_TOKEN               token da ManyChat, formato
+ *                                    `<pageId>:<segredo>` — só no backend
+ *
  *   INSTAGRAM_EXTERNAL_PROVIDER      nome do fornecedor (para o UI)
  *   INSTAGRAM_EXTERNAL_BASE_URL      origem HTTPS da API
  *   INSTAGRAM_EXTERNAL_API_KEY       credencial
@@ -31,6 +34,7 @@
 import { InstagramRegistry } from './registry.mjs';
 import { MetaInstagramProvider } from './meta.mjs';
 import { ExternalInstagramProvider } from './external.mjs';
+import { ManyChatInstagramProvider } from './manychat.mjs';
 import { MockInstagramProvider } from './mock.mjs';
 import { OutreachAudit } from './audit.mjs';
 import { OutreachQueue, LIMITES_PADRAO } from './queue.mjs';
@@ -79,6 +83,13 @@ export function construirRegistry(env = process.env, deps = {}) {
        da Graph API contra a documentação oficial (ver INSTAGRAM_PROVIDERS.md). */
     enabledForRealRequests: env.INSTAGRAM_META_ENABLED_FOR_REAL_REQUESTS === '1'
   }, deps));
+
+  /* ManyChat: fornecedor real. Sem token fica registado à mesma, como
+     "não configurado" — desaparecer do UI sem explicação é pior. */
+  registry.register(new ManyChatInstagramProvider({
+    apiToken: env.MANYCHAT_API_TOKEN || null,
+    fetchImpl: deps.fetch || null
+  }));
 
   if (env.INSTAGRAM_EXTERNAL_PROVIDER || env.INSTAGRAM_EXTERNAL_BASE_URL) {
     /* Se a configuração externa for não conforme, o construtor lança:
@@ -135,6 +146,8 @@ function variaveisEmFalta(providerId, env) {
     if (env.INSTAGRAM_META_ENABLED_FOR_REAL_REQUESTS !== '1') {
       falta.push('INSTAGRAM_META_ENABLED_FOR_REAL_REQUESTS (bloqueado: endpoints por validar)');
     }
+  } else if (providerId === 'manychat') {
+    if (!env.MANYCHAT_API_TOKEN) falta.push('MANYCHAT_API_TOKEN');
   } else if (providerId.startsWith('external')) {
     if (!env.INSTAGRAM_EXTERNAL_BASE_URL) falta.push('INSTAGRAM_EXTERNAL_BASE_URL');
     if (!env.INSTAGRAM_EXTERNAL_API_KEY) falta.push('INSTAGRAM_EXTERNAL_API_KEY');

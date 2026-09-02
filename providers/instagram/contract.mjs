@@ -24,12 +24,25 @@
 
 /** Capacidades que um fornecedor pode declarar. O UI adapta-se a estas. */
 export const CAPABILITIES = Object.freeze([
+  /* --- as originais: consumidas por dezenas de testes e pela UI --- */
   'canSendMessage',
   'canReadConversations',
   'canReceiveWebhooks',
   'canCheckEligibility',
   'canFetchProfile',
-  'canFetchDeliveryStatus'
+  'canFetchDeliveryStatus',
+
+  /* --- acrescentadas para a arquitetura multi-fornecedor ---
+     Servem para a interface parar de adivinhar. A diferença entre
+     «encontro o perfil» e «consigo escrever-lhe» é a diferença entre um
+     fornecedor que procura por username e um que só fala com quem já
+     falou primeiro — e é preciso poder dizer isso no ecrã. */
+  'canLookupByUsername',      /* @perfil → destinatário utilizável       */
+  'canLookupByEmailOrPhone',  /* email/telefone → destinatário           */
+  'canInitiateFirstContact',  /* falar com quem nunca escreveu           */
+  'requiresMessagingWindow',  /* sujeito a janela de 24 h / regras Meta  */
+  'canSendFlow',              /* dispara automações do fornecedor        */
+  'canSendFreeText'           /* aceita texto composto pelo LeadMap      */
 ]);
 
 /** Mapa de capacidades todas a false — ponto de partida de qualquer fornecedor. */
@@ -81,7 +94,71 @@ export const ELIGIBILITY = Object.freeze({
   INELIGIBLE: 'INELIGIBLE',
   /* Sem endpoint de elegibilidade no fornecedor, o estado é UNKNOWN.
      Nunca se assume que um username qualquer pode receber DM. */
-  UNKNOWN: 'UNKNOWN'
+  UNKNOWN: 'UNKNOWN',
+
+  /* --- estados que distinguem "achei" de "consigo falar" (§9/§10) ---
+     Ter `@empresa` prova que o perfil existe. Não prova que exista um
+     destinatário utilizável pela API, nem que a plataforma permita
+     escrever-lhe agora. Confundir as três coisas é como o produto
+     acabaria a prometer envios que nunca aconteceriam. */
+  PROFILE_FOUND_ONLY: 'PROFILE_FOUND_ONLY',   /* perfil sim, destinatário não */
+  NO_RECIPIENT_ID: 'NO_RECIPIENT_ID',         /* sem id utilizável pela API   */
+  OUTSIDE_ALLOWED_WINDOW: 'OUTSIDE_ALLOWED_WINDOW',
+  OPTED_OUT: 'OPTED_OUT',
+  ACCOUNT_NOT_CONNECTED: 'ACCOUNT_NOT_CONNECTED',
+  PROVIDER_NOT_CONFIGURED: 'PROVIDER_NOT_CONFIGURED',
+  PROVIDER_ERROR: 'PROVIDER_ERROR',
+  RATE_LIMITED: 'RATE_LIMITED'
+});
+
+/* ---------------------------------------------------------------- *
+ * Identidade do destinatário (§8)                                   *
+ * ---------------------------------------------------------------- */
+
+/**
+ * Descobrir um identificador NÃO é o mesmo que saber de quem é.
+ *
+ * Um IGSID chega por webhook e prova que alguém escreveu — não prova
+ * qual dos contactos do LeadMap é essa pessoa. Confundir as duas coisas
+ * é como se acaba a responder à pessoa errada com o nome de outra.
+ */
+export const IDENTITY_STATUS = Object.freeze({
+  NO_RECIPIENT_ID:       'NO_RECIPIENT_ID',       /* nada                       */
+  RECIPIENT_DISCOVERED:  'RECIPIENT_DISCOVERED',  /* id visto, dono desconhecido */
+  RECIPIENT_UNVERIFIED:  'RECIPIENT_UNVERIFIED',  /* associado, não confirmado   */
+  RECIPIENT_VERIFIED:    'RECIPIENT_VERIFIED',    /* confirmado pela API         */
+  RECIPIENT_CONFLICT:    'RECIPIENT_CONFLICT'     /* id já pertence a outro      */
+});
+
+export const IDENTITY_ROTULO = Object.freeze({
+  NO_RECIPIENT_ID: 'Sem destinatário',
+  RECIPIENT_DISCOVERED: 'Destinatário por identificar',
+  RECIPIENT_UNVERIFIED: 'Associado, por confirmar',
+  RECIPIENT_VERIFIED: 'Identidade confirmada',
+  RECIPIENT_CONFLICT: 'Conflito de identidade'
+});
+
+/** Só uma identidade confirmada sustenta um envio. */
+export function identidadeConfirmada(estado) {
+  return estado === IDENTITY_STATUS.RECIPIENT_VERIFIED;
+}
+
+/** Só isto autoriza um envio. Tudo o resto é «não», com um motivo. */
+export function podeEnviar(estado) { return estado === ELIGIBILITY.ELIGIBLE; }
+
+/** Frases para a interface. Nenhuma promete o que não se sabe. */
+export const ELIGIBILITY_ROTULO = Object.freeze({
+  ELIGIBLE: 'Elegível',
+  INELIGIBLE: 'Não elegível',
+  UNKNOWN: 'Desconhecido',
+  PROFILE_FOUND_ONLY: 'Perfil encontrado, sem envio por API',
+  NO_RECIPIENT_ID: 'Sem destinatário na API',
+  OUTSIDE_ALLOWED_WINDOW: 'Fora da janela permitida',
+  OPTED_OUT: 'Não contactar',
+  ACCOUNT_NOT_CONNECTED: 'Conta não ligada',
+  PROVIDER_NOT_CONFIGURED: 'Fornecedor não configurado',
+  PROVIDER_ERROR: 'Erro do fornecedor',
+  RATE_LIMITED: 'Limite atingido'
 });
 
 /* ---------------------------------------------------------------- *
@@ -103,6 +180,19 @@ export const ERROR_CODES = Object.freeze({
   ACCOUNT_RESTRICTED: { code: 'ACCOUNT_RESTRICTED', retryable: false },
   RECIPIENT_UNAVAILABLE: { code: 'RECIPIENT_UNAVAILABLE', retryable: false },
   RECIPIENT_INELIGIBLE: { code: 'RECIPIENT_INELIGIBLE', retryable: false },
+  /* O destinatário não existe como subscriber no fornecedor. Um
+     @instagram que o LeadMap encontrou não é, por si só, alguém com quem
+     se possa falar: alguém tem de ter iniciado a conversa primeiro. */
+  NOT_IN_MANYCHAT: { code: 'NOT_IN_MANYCHAT', retryable: false },
+  /* o fornecedor existe mas não está configurado nesta instalação */
+  PROVIDER_NOT_CONFIGURED: { code: 'PROVIDER_NOT_CONFIGURED', retryable: false },
+  /* a conta escolhida não está ligada ao fornecedor que devia usar */
+  ACCOUNT_NOT_CONNECTED: { code: 'ACCOUNT_NOT_CONNECTED', retryable: false },
+  /* o destinatário já pertence a outro contacto — nunca se move sozinho */
+  RECIPIENT_ALREADY_LINKED: { code: 'RECIPIENT_ALREADY_LINKED', retryable: false },
+  /* A plataforma recusou por causa da janela de mensagem (24 h, regras
+     de human agent, etc.). Não é para contornar: é para respeitar. */
+  OUTSIDE_ALLOWED_WINDOW: { code: 'OUTSIDE_ALLOWED_WINDOW', retryable: false },
   MESSAGE_REJECTED: { code: 'MESSAGE_REJECTED', retryable: false },
   NOT_SUPPORTED: { code: 'NOT_SUPPORTED', retryable: false },
   NOT_CONFIGURED: { code: 'NOT_CONFIGURED', retryable: false },

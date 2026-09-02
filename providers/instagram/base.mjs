@@ -216,17 +216,25 @@ export class BaseInstagramProvider {
 const MAX_MENSAGEM = 1000;
 
 function validarPedido(pedido) {
-  const { account, recipient, message } = pedido || {};
+  const { account, recipient, message, flowNs } = pedido || {};
   if (!account || !account.providerAccountId) {
     return new ProviderError('INVALID_REQUEST', 'Pedido sem conta de origem.');
   }
   if (!recipient || !(recipient.username || recipient.providerUserId)) {
     return new ProviderError('INVALID_REQUEST', 'Pedido sem destinatário.');
   }
-  if (typeof message !== 'string' || !message.trim()) {
-    return new ProviderError('INVALID_REQUEST', 'Mensagem vazia.');
+
+  /* Há duas formas legítimas de enviar, e o contrato tem de conhecer as
+     duas: texto composto aqui, ou uma automação já desenhada no
+     fornecedor (a ManyChat dispara flows, e o conteúdo vive lá). O que
+     não se aceita é um pedido sem nenhuma das duas — isso é mandar
+     nada a alguém. */
+  const temFlow = typeof flowNs === 'string' && flowNs.trim().length > 0;
+  const temTexto = typeof message === 'string' && message.trim().length > 0;
+  if (!temFlow && !temTexto) {
+    return new ProviderError('INVALID_REQUEST', 'Pedido sem mensagem nem automação.');
   }
-  if (message.length > MAX_MENSAGEM) {
+  if (temTexto && message.length > MAX_MENSAGEM) {
     return new ProviderError('INVALID_REQUEST', 'Mensagem acima de ' + MAX_MENSAGEM + ' caracteres.');
   }
   return null;

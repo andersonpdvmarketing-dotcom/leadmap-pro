@@ -184,6 +184,94 @@ export function exigirSegredoDoWorker(req, env = process.env) {
 }
 
 /* ---------------------------------------------------------------- *
+ * Origem (§50 CSRF)                                                 *
+ * ---------------------------------------------------------------- */
+
+const METODOS_MUTANTES = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
+/**
+ * Recusa mutações vindas de outra origem.
+ *
+ * `SameSite=Strict` já impede o browser de enviar o cookie a partir de
+ * outro site, e é essa a defesa principal. Isto é a segunda camada, para
+ * o caso de um cliente que não a respeite: um pedido que muda estado tem
+ * de trazer `Origin` (ou `Referer`) do próprio site. Pedidos sem nenhum
+ * dos dois — curl, um worker, um teste — passam, porque aí não há cookie
+ * de browser a ser reutilizado à socapa.
+ */
+export function exigirMesmaOrigem(req) {
+  if (!req || !METODOS_MUTANTES.includes(req.method)) return true;
+  const h = req.headers || {};
+  const origem = h.origin || h.Origin || null;
+  const referer = h.referer || h.Referer || null;
+  if (!origem && !referer) return true;            /* não é um browser */
+
+  const host = h['x-forwarded-host'] || h.host || null;
+  if (!host) return true;
+
+  let vinda;
+  try { vinda = new URL(origem || referer).host; } catch (e) { vinda = null; }
+  if (!vinda || vinda !== String(host)) {
+    throw new AuthError(403, 'FORBIDDEN', 'Origem do pedido não autorizada.');
+  }
+  return true;
+}
+
+/* ---------------------------------------------------------------- *
+ * Limitação de tentativas de login (§49)                            *
+ * ---------------------------------------------------------------- */
+
+export const LOGIN_MAX_TENTATIVAS = 8;
+export const LOGIN_JANELA_SEG = 300;
+
+/**
+ * Janela deslizante em memória.
+ *
+ * LIMITAÇÃO HONESTA: cada instância serverless tem a sua própria
+ * memória, por isso isto atrasa um atacante, não o bloqueia em
+ * definitivo. É o "limitador simples" pedido — não um serviço
+ * distribuído. Não guarda password nem hash: só um contador por
+ * identificador de origem.
+ */
+const tentativas = new Map();
+
+/** Identificador da origem do pedido. Nunca uma credencial. */
+export function origemDoPedido(req) {
+  const h = (req && req.headers) || {};
+  const xff = h['x-forwarded-for'] || h['X-Forwarded-For'] || '';
+  const ip = String(xff).split(',')[0].trim()
+    || h['x-real-ip'] || (req && req.socket && req.socket.remoteAddress) || 'desconhecida';
+  return String(ip);
+}
+
+export function limparTentativas(chave = null) {
+  if (chave === null) tentativas.clear(); else tentativas.delete(chave);
+}
+
+/** Lança 429 quando a janela já está cheia. */
+export function exigirTentativaDisponivel(chave, agora = Date.now()) {
+  const janela = agora - LOGIN_JANELA_SEG * 1000;
+  const lista = (tentativas.get(chave) || []).filter(t => t > janela);
+  if (lista.length >= LOGIN_MAX_TENTATIVAS) {
+    const err = new AuthError(429, 'TOO_MANY_ATTEMPTS',
+      'Demasiadas tentativas de entrada. Tente novamente dentro de alguns minutos.');
+    err.retryAfterSeg = LOGIN_JANELA_SEG;
+    throw err;
+  }
+  tentativas.set(chave, lista);
+  return LOGIN_MAX_TENTATIVAS - lista.length;
+}
+
+/** Regista uma tentativa falhada. O sucesso limpa o contador. */
+export function registarFalha(chave, agora = Date.now()) {
+  const janela = agora - LOGIN_JANELA_SEG * 1000;
+  const lista = (tentativas.get(chave) || []).filter(t => t > janela);
+  lista.push(agora);
+  tentativas.set(chave, lista);
+  return lista.length;
+}
+
+/* ---------------------------------------------------------------- *
  * Login                                                             *
  * ---------------------------------------------------------------- */
 

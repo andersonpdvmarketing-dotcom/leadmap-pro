@@ -153,7 +153,7 @@ test('até 5 contas; a sexta é rejeitada com a mensagem exata', () => {
   for (let i = 1; i <= MAX_CONTAS; i++) adicionarConta(est, { username: 'conta' + i });
   assert.equal(est.contas.length, 5);
   assert.throws(() => adicionarConta(est, { username: 'conta6' }),
-    /Limite máximo de 5 contas conectadas\./);
+    /Limite máximo de 5 contas registadas\./);
 });
 
 test('remover uma conta liberta espaço para outra', () => {

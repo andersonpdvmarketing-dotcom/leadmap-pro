@@ -305,9 +305,11 @@ test('classificação de 3000 leads é rápida e sem comparação quadrática', 
   for (const n of [100, 1000, 3000]) {
     const leads = [];
     for (let i = 1; i <= n; i++) leads.push(lead(i + n * 10));
-    const t0 = Date.now();
+    /* `performance.now()` porque com 100 leads o `Date.now()` mede 0 ms,
+       e um denominador de zero transforma ruído em falha. */
+    const t0 = performance.now();
     const r = classificarLeads(leads, idx, { searchId: 's' + n });
-    const t1 = Date.now();
+    const t1 = performance.now();
     idx.carregar(r.linhas);
     medidas[n] = t1 - t0;
     assert.equal(r.novas, n);
@@ -315,16 +317,25 @@ test('classificação de 3000 leads é rápida e sem comparação quadrática', 
   /* segunda passagem sobre 3000 já conhecidas: o custo tem de continuar linear */
   const repetidas = [];
   for (let i = 1; i <= 3000; i++) repetidas.push(lead(i + 30000));
-  const t0 = Date.now();
+  const t0 = performance.now();
   const r = classificarLeads(repetidas, idx, { searchId: 'rep' });
-  const tRep = Date.now() - t0;
+  const tRep = performance.now() - t0;
   assert.equal(r.jaCapturadas, 3000);
 
-  assert.ok(medidas[3000] < 3000, '3000 novas demorou ' + medidas[3000] + ' ms');
-  assert.ok(tRep < 3000, '3000 repetidas demorou ' + tRep + ' ms');
-  /* linearidade: 3000 não pode custar mais de 60× o de 100 */
-  const fator = (medidas[3000] + 1) / (medidas[100] + 1);
-  assert.ok(fator < 60, 'crescimento suspeito de quadrático: fator ' + fator.toFixed(1));
+  assert.ok(medidas[3000] < 3000, '3000 novas demorou ' + medidas[3000].toFixed(0) + ' ms');
+  assert.ok(tRep < 3000, '3000 repetidas demorou ' + tRep.toFixed(0) + ' ms');
+  /* Linearidade medida pelo custo POR LEAD — num algoritmo linear
+     mantém-se; num quadrático cresce com o tamanho.
+     A base é 1000 e não 100: com 100 leads a medida ronda décimas de
+     milissegundo, e num computador a correr a suite toda em paralelo
+     essa décima é quase só ruído. Comparar 1000 com 3000 mede a mesma
+     propriedade sobre números que existem de facto — um O(n²) daria
+     aqui ~3× e continuaria a ser apanhado. */
+  const porLead = n => medidas[n] / n;
+  const fator = porLead(3000) / Math.max(porLead(1000), 0.0001);
+  assert.ok(fator < 2.5,
+    'custo por lead cresceu ' + fator.toFixed(1) + '× entre 1000 e 3000 — suspeito de quadrático ' +
+    '(1000: ' + medidas[1000].toFixed(2) + ' ms, 3000: ' + medidas[3000].toFixed(2) + ' ms)');
 });
 
 test('índice faz lookup O(1) mesmo com 20 000 leads no registo', () => {

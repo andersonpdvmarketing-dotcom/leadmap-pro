@@ -219,7 +219,7 @@ export function adicionarConta(estado, { username, displayName, provider = 'mock
   }
   const ativas = estado.contas.filter(c => c.status !== ACCOUNT_STATUS.DISCONNECTED);
   if (ativas.length >= MAX_CONTAS) {
-    throw new Error('Limite máximo de ' + MAX_CONTAS + ' contas conectadas.');
+    throw new Error('Limite máximo de ' + MAX_CONTAS + ' contas registadas.');
   }
   /* normalizarConta é a mesma função que valida contas na Fase A */
   const base = normalizarConta({

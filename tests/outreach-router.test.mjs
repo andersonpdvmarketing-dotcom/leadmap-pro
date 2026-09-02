@@ -23,7 +23,8 @@ import { criarHashPassword, criarSessao, COOKIE_SESSAO } from '../providers/outr
  * Utilitários                                                       *
  * ---------------------------------------------------------------- */
 
-const NOMES = ['session', 'contacts', 'templates', 'accounts', 'campaigns', 'queue', 'audit', 'worker'];
+const NOMES = ['session', 'contacts', 'templates', 'accounts', 'campaigns', 'queue', 'audit', 'worker',
+               'manychat', 'integrations', 'db-probe', 'meta-webhook', 'providers', 'meta-test', 'identity'];
 
 function fingirRes() {
   const r = { _status: 0, _body: null, _headers: {}, writableEnded: false };
@@ -88,7 +89,7 @@ function cookieSessao(papeis, env) {
  * Resolução de rotas                                                *
  * ---------------------------------------------------------------- */
 
-test('ROUTER: os oito endpoints continuam a existir', () => {
+test('ROUTER: todos os endpoints continuam a existir', () => {
   assert.deepEqual(Object.keys(ROTAS).sort(), [...NOMES].sort());
   for (const n of NOMES) assert.equal(typeof ROTAS[n], 'function', n + ' não é um handler');
 });
@@ -126,7 +127,9 @@ test('ROUTER: método errado → 405 em cada endpoint', async () => {
   await comEnv(ENV_AUTH(), async () => {
     const errados = {
       session: 'PATCH', contacts: 'DELETE', templates: 'PUT', accounts: 'DELETE',
-      campaigns: 'DELETE', queue: 'POST', audit: 'POST', worker: 'GET'
+      campaigns: 'DELETE', queue: 'POST', audit: 'POST', worker: 'GET', manychat: 'DELETE',
+      integrations: 'POST', 'db-probe': 'POST', 'meta-webhook': 'PATCH',
+      providers: 'POST', 'meta-test': 'POST', identity: 'DELETE'
     };
     for (const [nome, metodo] of Object.entries(errados)) {
       const r = await chamar(pedido(nome, metodo));
@@ -150,7 +153,7 @@ test('ROUTER: 405 vem antes da autenticação — não revela nada', async () =>
 
 test('ROUTER: sem sessão → 401 nas rotas protegidas', async () => {
   await comEnv(ENV_AUTH(), async () => {
-    for (const nome of ['contacts', 'templates', 'accounts', 'campaigns', 'queue', 'audit']) {
+    for (const nome of ['contacts', 'templates', 'accounts', 'campaigns', 'queue', 'audit', 'manychat', 'providers', 'meta-test', 'identity']) {
       const r = await chamar(pedido(nome));
       assert.equal(r.status, 401, nome + ' sem sessão devia dar 401, deu ' + r.status);
       assert.equal(r.corpo.errorCode, 'UNAUTHENTICATED');
@@ -245,7 +248,7 @@ test('ROUTER: worker em produção recusa-se a usar o fornecedor de teste', asyn
 
 test('ROUTER: sem auth configurada → 503 NOT_CONFIGURED', async () => {
   await comEnv({ OUTREACH_ENV: 'production' }, async () => {
-    for (const nome of ['contacts', 'templates', 'accounts', 'campaigns', 'queue', 'audit']) {
+    for (const nome of ['contacts', 'templates', 'accounts', 'campaigns', 'queue', 'audit', 'manychat']) {
       const r = await chamar(pedido(nome));
       assert.equal(r.status, 503, nome + ' devia dar 503, deu ' + r.status);
       assert.equal(r.corpo.errorCode, 'NOT_CONFIGURED');
@@ -309,7 +312,9 @@ test('ROUTER: credenciais erradas → 401 e sem cookie', async () => {
 test('ROUTER: nenhum endpoint devolve 500 nem stack trace sem configuração', async () => {
   await comEnv({ OUTREACH_ENV: 'production' }, async () => {
     const metodos = { session: ['GET', 'POST', 'DELETE'], contacts: ['GET', 'POST'], templates: ['GET', 'POST', 'PATCH', 'DELETE'],
-      accounts: ['GET', 'POST'], campaigns: ['GET', 'POST'], queue: ['GET'], audit: ['GET'], worker: ['POST'] };
+      accounts: ['GET', 'POST'], campaigns: ['GET', 'POST'], queue: ['GET'], audit: ['GET'], worker: ['POST'],
+      manychat: ['GET', 'POST'], integrations: ['GET'], 'db-probe': ['GET'],
+      providers: ['GET'], 'meta-test': ['GET'], identity: ['GET', 'POST'] };
     for (const [nome, ms] of Object.entries(metodos)) {
       for (const m of ms) {
         const r = await chamar(pedido(nome, m));

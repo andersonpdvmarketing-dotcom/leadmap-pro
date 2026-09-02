@@ -58,6 +58,10 @@ export class OutreachRepository {
   async registarAuditoria() { throw new RepositoryError('NOT_IMPLEMENTED'); }
   async listarAuditoria() { throw new RepositoryError('NOT_IMPLEMENTED'); }
   async registarWebhook() { throw new RepositoryError('NOT_IMPLEMENTED'); }
+  async listarWebhooks() { throw new RepositoryError('NOT_IMPLEMENTED'); }
+  async contactoPorRecipient() { throw new RepositoryError('NOT_IMPLEMENTED'); }
+  async associarRecipient() { throw new RepositoryError('NOT_IMPLEMENTED'); }
+  async ultimoInboundDe() { throw new RepositoryError('NOT_IMPLEMENTED'); }
 }
 
 /* ---------------------------------------------------------------- *
@@ -97,7 +101,7 @@ export class InMemoryOutreachRepository extends OutreachRepository {
     }
     const ativas = [...this.contas.values()].filter(c => !c.disabledAt && c.status !== 'DISCONNECTED');
     if (ativas.length >= MAX_ACCOUNTS) {
-      throw new RepositoryError('MAX_ACCOUNTS', 'Limite máximo de ' + MAX_ACCOUNTS + ' contas conectadas.');
+      throw new RepositoryError('MAX_ACCOUNTS', 'Limite máximo de ' + MAX_ACCOUNTS + ' contas registadas.');
     }
     const agora = this.iso();
     const conta = {
@@ -123,7 +127,7 @@ export class InMemoryOutreachRepository extends OutreachRepository {
     for (const c of this.contactos.values()) {
       if (this.chaveContacto(c) === chave) {
         /* atualiza lacunas; nunca duplica e nunca reverte o opt-out */
-        for (const campo of ['name', 'company', 'city', 'district', 'activity', 'source', 'normalizedInstagram', 'leadId']) {
+        for (const campo of ['name', 'company', 'city', 'district', 'activity', 'source', 'normalizedInstagram', 'leadId', 'email', 'phone']) {
           if (!c[campo] && dados[campo]) c[campo] = dados[campo];
         }
         c.updatedAt = this.iso();
@@ -139,6 +143,8 @@ export class InMemoryOutreachRepository extends OutreachRepository {
       company: dados.company || null, city: dados.city || null, district: dados.district || null,
       activity: dados.activity || null, source: dados.source || null,
       status: CONTACT_STATUS.UNKNOWN, optedOutAt: null,
+      email: dados.email || null, phone: dados.phone || null,
+      igUserId: null, igUserIdProvider: null, igUserIdVerifiedAt: null,
       createdAt: agora, updatedAt: agora
     };
     this.contactos.set(contacto.id, contacto);
@@ -422,6 +428,69 @@ export class InMemoryOutreachRepository extends OutreachRepository {
     if (entityId) lista = lista.filter(a => a.entityId === entityId);
     if (action) lista = lista.filter(a => a.action === action);
     return { total: lista.length, items: lista.slice(offset, offset + limit) };
+  }
+
+  /** Eventos de webhook, do mais recente para o mais antigo. */
+  async listarWebhooks({ provider = null, limit = 50 } = {}) {
+    const todos = [...this.webhooks.values()]
+      .filter(e => !provider || e.provider === provider)
+      .sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)));
+    return { total: todos.length, items: todos.slice(0, limit) };
+  }
+
+  /** Procura exata por (fornecedor, identificador). Nunca aproximada. */
+  async contactoPorRecipient(provider, recipientId) {
+    if (!provider || !recipientId) return null;
+    for (const c of this.contactos.values()) {
+      if (c.igUserIdProvider === provider && c.igUserId === String(recipientId)) return c;
+    }
+    return null;
+  }
+
+  /**
+   * Liga um destinatário a um contacto.
+   *
+   * Idempotente: repetir a mesma associação não muda nada. Um
+   * identificador que já pertence a outro contacto é recusado — mover
+   * automaticamente seria transferir uma conversa entre pessoas sem
+   * ninguém decidir isso.
+   */
+  async associarRecipient({ contactId, provider, recipientId, verificado = false }) {
+    const c = this.contactos.get(contactId);
+    if (!c) throw new RepositoryError('NOT_FOUND', 'Contacto não encontrado.');
+    const dono = await this.contactoPorRecipient(provider, recipientId);
+    if (dono && dono.id !== contactId) {
+      throw new RepositoryError('RECIPIENT_ALREADY_LINKED',
+        'Este destinatário já está associado a outro contacto.');
+    }
+    const jaIgual = c.igUserId === String(recipientId) && c.igUserIdProvider === provider;
+    if (c.igUserId && !jaIgual) {
+      throw new RepositoryError('RECIPIENT_ALREADY_LINKED',
+        'O contacto já tem outro destinatário associado.');
+    }
+    c.igUserId = String(recipientId);
+    c.igUserIdProvider = provider;
+    if (verificado && !c.igUserIdVerifiedAt) c.igUserIdVerifiedAt = this.iso();
+    c.updatedAt = this.iso();
+    return { contacto: c, jaExistia: jaIgual };
+  }
+
+  /**
+   * Quando é que este destinatário escreveu pela última vez.
+   *
+   * Vem dos eventos de webhook — a mesma fonte que abriu a janela. Uma
+   * coluna no contacto seria uma segunda cópia da mesma verdade.
+   */
+  async ultimoInboundDe(provider, recipientId) {
+    let ultimo = null;
+    for (const e of this.webhooks.values()) {
+      if (e.provider !== provider) continue;
+      const p = e.payloadRedacted || {};
+      if (String(p.senderIgsid || '') !== String(recipientId)) continue;
+      const quando = p.at || e.receivedAt;
+      if (!ultimo || quando > ultimo) ultimo = quando;
+    }
+    return ultimo;
   }
 
   async registarWebhook({ provider, providerEventId, eventType, payload = {} }) {

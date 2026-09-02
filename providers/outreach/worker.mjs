@@ -32,17 +32,41 @@ export class OutreachWorker {
   /**
    * @param {object} opts
    * @param {OutreachRepository} opts.repository
-   * @param {object} opts.provider  fornecedor com sendMessage() normalizado
+   * @param {object} [opts.router]    InstagramProviderRouter — escolhe o
+   *                                  fornecedor item a item
+   * @param {object} [opts.provider]  fornecedor único (modo antigo)
    * @param {string} opts.workerId
    */
-  constructor({ repository, provider, workerId, lockTimeoutSeg = LOCK_TIMEOUT_SEG, agora = () => Date.now() } = {}) {
+  constructor({ repository, provider = null, router = null, workerId,
+                lockTimeoutSeg = LOCK_TIMEOUT_SEG, agora = () => Date.now() } = {}) {
     if (!repository) throw new Error('OutreachWorker exige um repository.');
-    if (!provider) throw new Error('OutreachWorker exige um provider.');
+    if (!provider && !router) throw new Error('OutreachWorker exige um provider ou um router.');
     this.repo = repository;
+    /* Os dois modos coexistem de propósito. Um worker construído com um
+       fornecedor único continua a funcionar exatamente como antes — é
+       assim que dezenas de testes o constroem, e migrá-los todos seria
+       trocar cobertura real por uma assinatura mais bonita. Havendo
+       router, é ele que manda. */
     this.provider = provider;
+    this.router = router;
     this.workerId = workerId || novoWorkerId();
     this.lockTimeoutSeg = lockTimeoutSeg;
     this.agora = agora;
+  }
+
+  /**
+   * Que fornecedor usar para um item concreto.
+   *
+   * Sem router, é o de sempre. Com router, quem decide é o `provider`
+   * gravado no item de fila — não uma configuração global nem o estado
+   * atual da conta.
+   */
+  resolverProvider(item, contacto) {
+    if (!this.router) return { provider: this.provider, providerType: (item && item.provider) || null, origem: 'injetado' };
+    return this.router.resolve({
+      item,
+      account: { provider: item && item.provider, id: item && item.accountId }
+    });
   }
 
   /** Uma passagem: reclama até `limit` itens e processa-os. */
@@ -95,9 +119,30 @@ export class OutreachWorker {
       metadata: { attempt: item.attemptCount, provider: item.provider }
     });
 
+    /* Resolver o fornecedor ANTES de qualquer envio. Um fornecedor
+       desconhecido ou não configurado falha aqui, sem sair nada — e sem
+       tentar outro (§20: um fallback automático podia duplicar a
+       mensagem para uma pessoa real). */
+    let escolha;
+    try {
+      escolha = this.resolverProvider(item, contacto);
+    } catch (err) {
+      await this.repo.concluirItem({
+        itemId: item.id, outcome: 'FAILED',
+        errorCode: (err && err.errorCode) || 'PROVIDER_NOT_CONFIGURED',
+        errorMessage: String(err && err.message)
+      });
+      await this.repo.registarAuditoria({
+        actor: this.workerId, action: AUDIT_ACTION.MESSAGE_FAILED,
+        entityType: 'message', entityId: item.messageId,
+        metadata: { errorCode: (err && err.errorCode) || 'PROVIDER_NOT_CONFIGURED', provider: item.provider }
+      });
+      return { outcome: 'FAILED', motivo: (err && err.errorCode) || 'PROVIDER_NOT_CONFIGURED' };
+    }
+
     let resposta;
     try {
-      resposta = await this.provider.sendMessage({
+      resposta = await escolha.provider.sendMessage({
         account: { providerAccountId: item.accountId, id: item.accountId },
         recipient: { username: contacto.normalizedInstagram },
         message: corpo.texto,

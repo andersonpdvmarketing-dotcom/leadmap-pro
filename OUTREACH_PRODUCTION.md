@@ -307,11 +307,34 @@ OUTREACH_WORKER_SECRET
 OUTREACH_ENV
 ```
 
-Gerar o hash da password:
+| Variável | Uso | Secret | Preview | Production | Browser | Obrigatória |
+|---|---|---|---|---|---|---|
+| `OUTREACH_DB_URL` | URL do PostgREST/Supabase | não | opcional | sim | **nunca** | sim |
+| `OUTREACH_DB_SERVICE_KEY` | Chave de serviço do PostgREST | **sim** | opcional | sim | **nunca** | sim |
+| `OUTREACH_DB_SCHEMA` | Esquema (omissão: `outreach`) | não | opcional | opcional | **nunca** | não |
+| `OUTREACH_AUTH_SECRET` | Assina a sessão (≥32 chars aleatórios) | **sim** | opcional | sim | **nunca** | sim |
+| `OUTREACH_OPERATOR_EMAIL` | Email do operador autorizado | não | opcional | sim | **nunca** | sim |
+| `OUTREACH_OPERATOR_PASSWORD_HASH` | Hash scrypt da password | **sim** | opcional | sim | **nunca** | sim |
+| `OUTREACH_WORKER_SECRET` | Segredo do endpoint do worker | **sim** | opcional | sim | **nunca** | sim |
+| `OUTREACH_ENV` | `development` / `test` / `production` | não | sim | sim | **nunca** | sim |
+| `OUTREACH_ADMIN_DATABASE_URL` | DSN direta, **só para migrations** | **sim** | não | **não** | **nunca** | apenas local |
+| `OUTREACH_TEST_DATABASE_URL` | DSN da suite de testes | **sim** | não | **não** | **nunca** | apenas local |
 
-```js
-import { criarHashPassword } from './providers/outreach/auth.mjs';
-console.log(criarHashPassword('a-sua-password'));
+`SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são aceites como alternativa
+às duas primeiras. Prefira os nomes `OUTREACH_DB_*`: dizem para que
+servem e não colidem com convenções de frameworks que expõem variáveis
+`SUPABASE_*` ao browser.
+
+As duas últimas **nunca** vão para a Vercel. São DSNs diretas de
+PostgreSQL, usadas por ferramentas que correm na máquina de quem
+administra; pô-las no ambiente do runtime daria à função serverless um
+caminho para executar DDL, que é precisamente o que se quer impedir.
+
+Gerar o hash da password — a password não é escrita em ficheiro, log nem
+histórico da shell:
+
+```bash
+node tools/hash-password.mjs
 ```
 
 ---
@@ -395,10 +418,130 @@ janela tem de ser fechada por reconciliação: consultar o fornecedor pelo
 
 ### Sem UI para a Fase C
 
-A interface do Outreach continua a usar o `LocalOutreachStore`. O
-`RemoteOutreachStore` existe, está testado, mas ligá-lo à UI — com ecrã
-de login e botão de migração — é trabalho de interface que não foi
-pedido nesta fase.
+---
+
+## 15A. Sessão e armazenamento remoto (Fase D)
+
+### O que a interface mostra
+
+`providers/outreach/session-gate.mjs` pergunta ao backend em que estado
+está e decide o ecrã. Nunca adivinha.
+
+| Resposta de `/session` | Ecrã | Dados visíveis |
+|---|---|---|
+| `configured: false` | «Outreach ainda não configurado» | **nenhum** — anuncia-se apenas quantos registos existem por migrar |
+| `authenticated: false` | Ecrã de entrada | nenhum |
+| `databaseConfigured: false` | «Base de dados por configurar» | nenhum |
+| tudo verdadeiro | Aplicação | **do servidor** |
+| erro / sem resposta | «Outreach temporariamente indisponível» | **nenhum** |
+
+### A regra que manda em tudo
+
+**Quando o backend falha, não se volta ao armazenamento local.** Mostrar
+dados locais a quem entrou numa conta é mostrar-lhe uma realidade que não
+existe: acredita estar a ver a base de dados, edita em cima disso, e as
+duas versões separam-se em silêncio. Um erro visível é sempre melhor.
+
+Consequências no código: `guardar()` recusa-se **em voz alta** em sessão
+remota (se algo lá chegar é um caminho de escrita por ligar, e é melhor
+dar erro à vista do que gravar no sítio errado), e `carregarRemoto()`
+**limpa** o estado em memória antes de mostrar o erro, para que nem dados
+remotos antigos fiquem no ecrã a passar por atuais.
+
+**Não há modo local de operação.** A partir da Fase D o
+`LocalOutreachStore` existe para exatamente quatro coisas: detetar dados
+antigos nesta máquina, mostrar a previsão da migração, executá-la, e
+servir de cópia até haver autorização para limpeza. Não se opera
+contactos, templates nem campanhas através dele.
+
+### Escritas em sessão remota
+
+| Ação | Caminho |
+|---|---|
+| Importar contactos (de Leads) | `POST /contacts` |
+| Criar, editar, duplicar, eliminar template | `/templates` |
+| Registar conta | `POST /accounts` (teto de 5 imposto pela base) |
+| Remover conta | **sem rota** — recusa visível |
+| Gerar fila, mudar estado de campanha | **sem rota exposta** — recusa visível |
+| Opt-out / reativar contacto | **sem rota** — recusa visível |
+
+As três últimas dizem-no ao utilizador em vez de fingirem que
+funcionaram. Ligá-las é trabalho de backend (rotas novas), não de
+interface.
+
+A sessão é reavaliada **sempre que se entra na vista** — é assim que se
+descobre uma sessão expirada ou um backend que caiu entretanto. Custa seis
+pedidos por entrada; é o preço de não mentir.
+
+### Autenticação
+
+| | |
+|---|---|
+| Login | `POST /api/outreach/session`, email + password |
+| Password | hash scrypt em variável de ambiente, `timingSafeEqual` |
+| Sessão | HMAC-SHA256, cookie `HttpOnly + Secure + SameSite=Strict` |
+| Expiração | 12 horas, verificada no servidor |
+| Fixação | cada entrada emite uma sessão nova; não há sessão pré-login |
+| Logout | `DELETE /api/outreach/session` — invalida o cookie, **não apaga dados** |
+| Força bruta | 8 tentativas por origem em 5 minutos → `429` com `Retry-After` |
+| CSRF | `SameSite=Strict` + validação de `Origin`/`Referer` nas mutações |
+| Cache | `no-store, no-cache, must-revalidate, private` + `Vary: Cookie` |
+
+**Limitação honesta do limitador:** a janela vive em memória e cada
+instância serverless tem a sua. Atrasa um atacante, não o bloqueia em
+definitivo. É o «limitador simples» pedido, não um serviço distribuído.
+
+### Migração
+
+O botão «Migrar dados locais» mostra primeiro o que vai acontecer:
+
+```
+Contactos: 2 · Templates: 1 · Campanhas em rascunho: 1
+Fica de fora — mensagens de simulação: 2 · itens de fila: 1 ·
+campanhas já executadas: 1 · contactos sem identidade: 1 · contas locais: 1
+```
+
+Só depois de o utilizador confirmar é que algo é escrito
+(`executarMigracao` recusa-se sem `confirmado: true`). É idempotente e
+**o estado local nunca é apagado**.
+
+---
+
+## 15B. Ferramentas administrativas
+
+Correm na máquina de quem administra. Não são servidas pela Vercel e
+**não existe nenhuma rota HTTP equivalente** — uma rota capaz de DDL é
+uma rota capaz de destruir a base de dados.
+
+| Ferramenta | Para quê |
+|---|---|
+| `node tools/hash-password.mjs` | Gerar `OUTREACH_OPERATOR_PASSWORD_HASH` |
+| `OUTREACH_ADMIN_DATABASE_URL=… node tools/apply-migrations.mjs` | Aplicar migrations (`--dry-run` mostra o plano) |
+| `OUTREACH_ADMIN_DATABASE_URL=… node tools/check-schema.mjs` | Confirmar o esquema real contra o catálogo |
+
+`apply-migrations` recusa-se a correr contra a base da suite de testes.
+
+### Cópias de segurança
+
+Não há automatismo nesta fase, e não vale a pena fingir que há. O que
+existe depende do fornecedor escolhido: o Supabase inclui *point-in-time
+recovery* e retenção de backups **conforme o plano contratado** — antes
+de confiar nisso, confirme no painel do projeto qual é a retenção real do
+seu plano. Independentemente disso, `pg_dump` contra
+`OUTREACH_ADMIN_DATABASE_URL` produz um backup completo e é o mínimo
+recomendado antes de qualquer migration nova.
+
+### Desligar a Fase D (rollback)
+
+Remover `OUTREACH_DB_URL` e `OUTREACH_DB_SERVICE_KEY` do ambiente da
+Vercel faz o backend voltar a `NOT_CONFIGURED`: as rotas respondem 503, a
+interface do Outreach mostra «ainda não configurado», e **o LeadMap
+continua a funcionar exatamente na mesma** — pesquisa, histórico,
+IndexedDB e XLSX não dependem de nada disto.
+
+Remover também `OUTREACH_AUTH_SECRET` desativa a autenticação. Os dados
+já gravados ficam na base de dados, intactos; nada é apagado por
+desligar variáveis.
 
 ---
 

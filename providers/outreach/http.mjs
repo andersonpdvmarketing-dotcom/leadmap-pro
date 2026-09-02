@@ -10,7 +10,7 @@
 import { InMemoryOutreachRepository } from './repository.mjs';
 import { PostgresOutreachRepository, bancoConfigurado } from './postgres.mjs';
 import { OutreachService } from './service.mjs';
-import { exigirSessao, exigirPapel, AuthError, authConfigurada } from './auth.mjs';
+import { exigirSessao, exigirPapel, AuthError, authConfigurada, exigirMesmaOrigem } from './auth.mjs';
 import { ambienteDe, redigir, paginacao } from './domain.mjs';
 
 /** Repositório partilhado por invocação (serverless: nada crítico em RAM). */
@@ -43,6 +43,10 @@ export function responderErro(res, err, requestId, env = process.env) {
     message: (err && err.message) ? String(err.message) : 'Erro inesperado.',
     requestId
   };
+  semCache(res);
+  if (err && err.retryAfterSeg && typeof res.setHeader === 'function') {
+    res.setHeader('Retry-After', String(err.retryAfterSeg));
+  }
   if (ambienteDe(env) !== 'production' && err && err.stack) corpo.stack = String(err.stack).split('\n').slice(0, 4);
   /* log estruturado, com segredos redigidos (§73) */
   console.error(JSON.stringify(redigir({
@@ -52,7 +56,22 @@ export function responderErro(res, err, requestId, env = process.env) {
 }
 
 export function responderOk(res, dados, requestId) {
+  semCache(res);
   return res.status(200).json({ success: true, requestId, ...dados });
+}
+
+/**
+ * Dados de Outreach são privados: nem o browser nem a CDN os guardam.
+ * Sem isto, uma resposta com contactos podia ficar num cache partilhado
+ * e ser servida a outra pessoa (§54).
+ */
+export function semCache(res) {
+  if (res && typeof res.setHeader === 'function') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Vary', 'Cookie');
+  }
+  return res;
 }
 
 /**
@@ -68,6 +87,7 @@ export function rota({ metodos = ['GET'], papel = 'outreach:operator', handler }
         return res.status(405).json({ success: false, errorCode: 'METHOD_NOT_ALLOWED', message: 'Método não permitido.', requestId });
       }
       const env = process.env;
+      exigirMesmaOrigem(req);                       /* 403 CSRF */
       if (!authConfigurada(env)) {
         throw new AuthError(503, 'NOT_CONFIGURED', 'Autenticação do Outreach não configurada no backend.');
       }

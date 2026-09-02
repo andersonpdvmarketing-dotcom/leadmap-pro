@@ -102,7 +102,7 @@ export class PostgresOutreachRepository extends OutreachRepository {
         throw new RepositoryError('DUPLICATE', String(msg));
       }
       if (/MAX_ACCOUNTS/.test(String(msg))) {
-        throw new RepositoryError('MAX_ACCOUNTS', 'Limite máximo de 5 contas conectadas.');
+        throw new RepositoryError('MAX_ACCOUNTS', 'Limite máximo de 5 contas registadas.');
       }
       if (/CAMPAIGN_TERMINAL/.test(String(msg))) throw new RepositoryError('CAMPAIGN_TERMINAL', String(msg));
       if (/NOT_FOUND|no_data_found/i.test(String(msg))) throw new RepositoryError('NOT_FOUND', String(msg));
@@ -282,6 +282,58 @@ export class PostgresOutreachRepository extends OutreachRepository {
   /* O worker chama isto por cada item reclamado, para reavaliar o
      opt-out no momento do envio. Sem este método o worker rebenta
      contra este adapter — que é o único que corre na Vercel. */
+  async listarWebhooks({ provider = null, limit = 50 } = {}) {
+    const filtros = { select: '*', order: 'received_at.desc', limit };
+    if (provider) filtros.provider = 'eq.' + provider;
+    const linhas = await this.pedir('/rest/v1/webhook_event' + this.q(filtros));
+    return { total: (linhas || []).length, items: (linhas || []).map(r => ({
+      id: r.id, provider: r.provider, providerEventId: r.provider_event_id,
+      eventType: r.event_type, payloadRedacted: r.payload_redacted || {},
+      receivedAt: r.received_at, processedAt: r.processed_at, status: r.status
+    })) };
+  }
+
+  /** Procura exata por (fornecedor, identificador). */
+  async contactoPorRecipient(provider, recipientId) {
+    if (!provider || !recipientId) return null;
+    const linhas = await this.pedir('/rest/v1/contact' + this.q({
+      select: '*', ig_user_id_provider: 'eq.' + provider, ig_user_id: 'eq.' + recipientId, limit: 2
+    }));
+    if (!linhas || !linhas.length) return null;
+    return mapContacto(linhas[0]);
+  }
+
+  async associarRecipient({ contactId, provider, recipientId, verificado = false }) {
+    const dono = await this.contactoPorRecipient(provider, recipientId);
+    if (dono && dono.id !== contactId) {
+      throw new RepositoryError('RECIPIENT_ALREADY_LINKED', 'Este destinatário já está associado a outro contacto.');
+    }
+    const atual = await this.lerContacto(contactId);
+    if (!atual) throw new RepositoryError('NOT_FOUND', 'Contacto não encontrado.');
+    const jaIgual = atual.igUserId === String(recipientId) && atual.igUserIdProvider === provider;
+    if (atual.igUserId && !jaIgual) {
+      throw new RepositoryError('RECIPIENT_ALREADY_LINKED', 'O contacto já tem outro destinatário associado.');
+    }
+    const campos = { ig_user_id: String(recipientId), ig_user_id_provider: provider };
+    if (verificado && !atual.igUserIdVerifiedAt) campos.ig_user_id_verified_at = new Date().toISOString();
+    const linhas = await this.pedir('/rest/v1/contact' + this.q({ id: 'eq.' + contactId }), {
+      metodo: 'PATCH', prefer: 'return=representation', corpo: campos
+    });
+    return { contacto: mapContacto(linhas && linhas[0]), jaExistia: jaIgual };
+  }
+
+  /** Última mensagem recebida deste destinatário, pelos eventos de webhook. */
+  async ultimoInboundDe(provider, recipientId) {
+    const linhas = await this.pedir('/rest/v1/webhook_event' + this.q({
+      select: 'received_at,payload_redacted', provider: 'eq.' + provider,
+      'payload_redacted->>senderIgsid': 'eq.' + recipientId,
+      order: 'received_at.desc', limit: 1
+    }));
+    if (!linhas || !linhas.length) return null;
+    const l = linhas[0];
+    return (l.payload_redacted && l.payload_redacted.at) || l.received_at || null;
+  }
+
   async lerContacto(id) {
     const linhas = await this.pedir('/rest/v1/contact' + this.q({ select: '*', id: 'eq.' + id, limit: 1 }));
     return (linhas && linhas[0]) ? mapContacto(linhas[0]) : null;
@@ -345,6 +397,10 @@ const mapContacto = r => r && ({
   id: r.id, leadId: r.lead_id, normalizedInstagram: r.normalized_instagram,
   name: r.name, company: r.company, city: r.city, district: r.district,
   activity: r.activity, source: r.source, status: r.status, optedOutAt: r.opted_out_at,
+  email: r.email || null, phone: r.phone || null,
+  igUserId: r.ig_user_id || null,
+  igUserIdProvider: r.ig_user_id_provider || null,
+  igUserIdVerifiedAt: r.ig_user_id_verified_at || null,
   createdAt: r.created_at, updatedAt: r.updated_at
 });
 

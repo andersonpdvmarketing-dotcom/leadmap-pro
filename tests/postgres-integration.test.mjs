@@ -14,7 +14,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { ligar } from '../providers/outreach/pg-client.mjs';
 
 const DSN = process.env.OUTREACH_TEST_DATABASE_URL || null;
@@ -24,7 +24,11 @@ const nota = saltar
   ? 'sem OUTREACH_TEST_DATABASE_URL — testes de PostgreSQL saltados'
   : false;
 
-const MIGRATIONS = ['001_outreach_base', '002_outreach_indexes', '003_outreach_functions'];
+/* Lida da pasta, por ordem, em vez de escrita à mão: uma migration nova
+   entrava em produção e a suite continuava a testar o esquema antigo —
+   foi o que aconteceu com a 004. */
+const MIGRATIONS = readdirSync(new URL('../migrations/', import.meta.url))
+  .filter(f => f.endsWith('.sql')).sort().map(f => f.replace(/\.sql$/, ''));
 const sql = nome => readFileSync(new URL('../migrations/' + nome + '.sql', import.meta.url), 'utf8');
 
 async function abrir() {
@@ -678,5 +682,107 @@ test('PG-REPO: webhook idempotente através do repositório', { skip: nota }, as
     assert.equal(b.duplicado, true);
     const r = await c.query(`SELECT payload_redacted::text AS p FROM outreach.webhook_event WHERE provider_event_id='e1'`);
     assert.equal(r.rows[0].p.includes('SEGREDO'), false, 'o payload guardado tem de estar redigido');
+  } finally { await c.fim(); }
+});
+
+/* ================================================================ *
+ * §19 Migration 005 — identidade, contra PostgreSQL real            *
+ * ================================================================ */
+
+test('PG-005: a migration aplica e cria colunas, constraint e índices', { skip: nota }, async () => {
+  const c = await ligar(DSN);
+  try {
+    const cols = await c.query(`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='outreach' AND table_name='contact'
+        AND column_name IN ('ig_user_id','ig_user_id_provider','ig_user_id_verified_at') ORDER BY 1`);
+    assert.deepEqual(cols.rows.map(r => r.column_name),
+      ['ig_user_id', 'ig_user_id_provider', 'ig_user_id_verified_at']);
+
+    const idx = await c.query(`SELECT indexname FROM pg_indexes
+      WHERE schemaname='outreach' AND indexname='contact_provider_recipient_uk'`);
+    assert.equal(idx.rows.length, 1, 'falta o índice único parcial');
+
+    const chk = await c.query(`SELECT conname FROM pg_constraint
+      WHERE conname='contact_ig_identity_chk'`);
+    assert.equal(chk.rows.length, 1, 'falta a constraint que mantém os dois campos juntos');
+  } finally { await c.fim(); }
+});
+
+test('PG-005: vários contactos sem identificador continuam válidos', { skip: nota }, async () => {
+  const c = await ligar(DSN);
+  try {
+    await c.query(`DELETE FROM outreach.contact WHERE id LIKE 'id005:%'`);
+    for (let i = 1; i <= 4; i++) {
+      await c.query(`INSERT INTO outreach.contact (id, name, lead_id) VALUES ($1, $2, $3)`, ['id005:n' + i, 'Sem id ' + i, 'L005n' + i]);
+    }
+    const r = await c.query(`SELECT count(*) AS n FROM outreach.contact WHERE id LIKE 'id005:n%'`);
+    assert.equal(Number(r.rows[0].n), 4, 'o índice único bloqueou NULLs — devia ser parcial');
+  } finally { await c.fim(); }
+});
+
+test('PG-005: o mesmo destinatário não pode pertencer a dois contactos', { skip: nota }, async () => {
+  const c = await ligar(DSN);
+  try {
+    await c.query(`DELETE FROM outreach.contact WHERE id LIKE 'id005:%'`);
+    await c.query(`INSERT INTO outreach.contact (id, name, lead_id, ig_user_id, ig_user_id_provider)
+                   VALUES ('id005:a', 'A', 'L005a', '778899', 'meta')`);
+    let bloqueou = false;
+    try {
+      await c.query(`INSERT INTO outreach.contact (id, name, lead_id, ig_user_id, ig_user_id_provider)
+                     VALUES ('id005:b', 'B', 'L005b', '778899', 'meta')`);
+    } catch (e) { bloqueou = true; }
+    assert.equal(bloqueou, true, 'o banco deixou dois contactos ficar com o mesmo destinatário');
+
+    /* o MESMO identificador noutro fornecedor é outra identidade */
+    await c.query(`INSERT INTO outreach.contact (id, name, lead_id, ig_user_id, ig_user_id_provider)
+                   VALUES ('id005:c', 'C', 'L005c', '778899', 'manychat')`);
+    const r = await c.query(`SELECT count(*) AS n FROM outreach.contact WHERE ig_user_id = '778899'`);
+    assert.equal(Number(r.rows[0].n), 2);
+  } finally { await c.fim(); }
+});
+
+test('PG-005: identificador sem fornecedor é recusado pela constraint', { skip: nota }, async () => {
+  const c = await ligar(DSN);
+  try {
+    await c.query(`DELETE FROM outreach.contact WHERE id LIKE 'id005:%'`);
+    let bloqueou = false;
+    try {
+      await c.query(`INSERT INTO outreach.contact (id, name, lead_id, ig_user_id) VALUES ('id005:x', 'X', 'L005x', '111')`);
+    } catch (e) { bloqueou = true; }
+    assert.equal(bloqueou, true, 'aceitou um identificador sem dizer de que fornecedor é');
+  } finally { await c.fim(); }
+});
+
+test('PG-005: dados anteriores à migration continuam intactos', { skip: nota }, async () => {
+  const c = await ligar(DSN);
+  try {
+    await c.query(`DELETE FROM outreach.contact WHERE id LIKE 'id005:%'`);
+    await c.query(`INSERT INTO outreach.contact (id, name, normalized_instagram, email)
+                   VALUES ('id005:antigo', 'Antigo', 'perfil_antigo', 'a@b.pt')`);
+    const r = await c.query(`SELECT name, normalized_instagram, email, ig_user_id
+                               FROM outreach.contact WHERE id = 'id005:antigo'`);
+    assert.equal(r.rows[0].name, 'Antigo');
+    assert.equal(r.rows[0].normalized_instagram, 'perfil_antigo');
+    assert.equal(r.rows[0].email, 'a@b.pt');
+    assert.equal(r.rows[0].ig_user_id, null);
+    await c.query(`DELETE FROM outreach.contact WHERE id LIKE 'id005:%'`);
+  } finally { await c.fim(); }
+});
+
+test('PG-005: associarRecipient pelo repositório respeita o conflito', { skip: nota }, async () => {
+  const { PgOutreachRepository } = await import('../providers/outreach/pg-repository.mjs');
+  const c = await ligar(DSN);
+  /* o repositório recebe a ligação já aberta, como nos outros testes */
+  const repo = new PgOutreachRepository(c);
+  try {
+    await c.query(`DELETE FROM outreach.contact WHERE id LIKE 'id005:%'`);
+    await c.query(`INSERT INTO outreach.contact (id, name, lead_id) VALUES ('id005:p1', 'P1', 'L005p1'), ('id005:p2', 'P2', 'L005p2')`);
+    await repo.associarRecipient({ contactId: 'id005:p1', provider: 'meta', recipientId: '424242', verificado: true });
+    const dono = await repo.contactoPorRecipient('meta', '424242');
+    assert.equal(dono.id, 'id005:p1');
+    await assert.rejects(
+      () => repo.associarRecipient({ contactId: 'id005:p2', provider: 'meta', recipientId: '424242' }),
+      (e) => e.errorCode === 'RECIPIENT_ALREADY_LINKED');
+    await c.query(`DELETE FROM outreach.contact WHERE id LIKE 'id005:%'`);
   } finally { await c.fim(); }
 });

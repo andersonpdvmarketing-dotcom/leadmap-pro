@@ -148,7 +148,24 @@ a:hover { color: var(--ink-hover); }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .topbar-divider { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
 
+/* Em ecrãs estreitos a barra passou a ter mais um botão (Configurações)
+   e ficava 4 px acima da largura da janela — o suficiente para a página
+   inteira ganhar scroll horizontal. Aperta-se aqui, em vez de esconder
+   o botão: o acesso às Configurações não devia depender do tamanho do
+   ecrã. */
+@media (max-width: 420px) {
+  .topbar-actions { gap: 4px; }
+  .topbar-divider { margin: 0 1px; }
+}
+
 /* ---------- Botões ---------- */
+/* `display: inline-flex` num .btn vence o `display:none` que o browser
+   dá ao atributo hidden. Sem isto, um botão que o código julga
+   escondido continua visível e clicável — foi o que aconteceu ao
+   "Processar fila", que deve estar fora de alcance enquanto não houver
+   fornecedor de envio aprovado. */
+[hidden] { display: none !important; }
+
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   height: 36px; padding: 0 13px;
@@ -541,6 +558,66 @@ table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-wid
 .sim-banner b { font-weight: 700; }
 .sim-banner .ic { color: var(--warn); flex: none; }
 
+.o-acct-prov {
+  font-size: 11px; font-weight: 600; letter-spacing: .02em;
+  padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2);
+}
+.cfg-sub { margin: 0 0 6px; font-size: 15px; }
+.cfg-nota { margin: 0 0 18px; font-size: 12.5px; color: var(--text-2); line-height: 1.55; }
+.cfg-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.cfg-topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cfg-nome { font-weight: 600; font-size: 14px; }
+.cfg-desc { margin: 5px 0 0; font-size: 12.5px; color: var(--text-2); }
+.cfg-luz { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--muted); }
+.cfg-luz.on { background: var(--ok, #16a34a); }
+.cfg-luz.erro { background: var(--danger, #dc2626); }
+.cfg-estado { font-size: 12px; color: var(--text-2); }
+.cfg-envs { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.cfg-env {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-2);
+  background: none; cursor: pointer;
+}
+.cfg-env:hover { color: var(--text); }
+.cfg-env.falta { border-style: dashed; }
+.cfg-acoes { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.cfg-detalhe { margin-top: 10px; font-size: 12.5px; color: var(--text-2); }
+
+.o-mc { margin-top: 16px; }
+.o-mc .o-status { font-size: 11px; }
+.o-mc-linha { display: flex; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.o-mc-linha span:first-child { color: var(--text-2); min-width: 132px; }
+.o-mc-flow { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.o-mc-flow code { font-size: 11px; color: var(--muted); }
+.o-et dl { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 0 0 16px; font-size: 13.5px; }
+.o-et dt { color: var(--text-2); }
+.o-et dd { margin: 0; word-break: break-word; }
+.o-et .o-aviso { border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; font-size: 12.5px; color: var(--text-2); }
+
+.o-sessao {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; margin-bottom: 14px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+  font-size: 13px; color: var(--text-2);
+}
+.o-sessao .ic { color: var(--ok, #16a34a); }
+.o-sessao-tag {
+  font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted);
+}
+.o-gate { max-width: 460px; margin: 32px auto; }
+.o-gate .o-card { padding: 26px; }
+.o-gate h3 { margin: 0 0 8px; font-size: 17px; }
+.o-gate p { margin: 0 0 18px; color: var(--text-2); font-size: 13.5px; line-height: 1.55; }
+.o-gate label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+.o-gate input { width: 100%; margin-bottom: 14px; }
+.o-gate .o-erro { color: var(--danger, #dc2626); font-size: 13px; margin: 0 0 12px; min-height: 18px; }
+.o-gate-acoes { display: flex; gap: 8px; align-items: center; }
+.o-migracao dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin: 0 0 18px; font-size: 13.5px; }
+.o-migracao dt { color: var(--text-2); }
+.o-migracao dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.o-migracao .ignorado dt, .o-migracao .ignorado dd { color: var(--muted); }
 .o-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
 .o-tabs button {
   height: 34px; padding: 0 13px; border: 0; background: transparent; cursor: pointer;
@@ -777,6 +854,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <symbol id="ic-pin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5S5 15.2 5 9.8a7 7 0 0 1 14 0c0 5.4-7 11.7-7 11.7z"/><circle cx="12" cy="9.8" r="2.4"/></g></symbol>
     <symbol id="ic-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 3.2"/></g></symbol>
     <symbol id="ic-trash" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h17M8.5 6.5V4.8A1.3 1.3 0 0 1 9.8 3.5h4.4a1.3 1.3 0 0 1 1.3 1.3v1.7M18.8 6.5l-.9 13a1.5 1.5 0 0 1-1.5 1.4H7.6a1.5 1.5 0 0 1-1.5-1.4l-.9-13"/><path d="M10 10.5v6M14 10.5v6"/></g></symbol>
+    <symbol id="ic-cog" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></g></symbol>
     <symbol id="ic-ext" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18.5 13.5v5a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2h5"/><path d="M15 3.5h5.5V9M20.8 3.2 11.5 12.5"/></g></symbol>
     <symbol id="ic-globe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18M12 3a14.5 14.5 0 0 0 0 18"/></g></symbol>
     <symbol id="ic-map" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 6.5v14l7-3 7 3 7-3v-14l-7 3-7-3-7 3z"/><path d="M8.5 3.5v14M15.5 6.5v14"/></g></symbol>
@@ -803,6 +881,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <button class="btn btn-ghost btn-icon" id="themeToggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
       <svg class="ic" id="themeIconSun"><use href="#ic-sun"/></svg>
       <svg class="ic" id="themeIconMoon" style="display:none"><use href="#ic-moon"/></svg>
+    </button>
+    <button class="btn btn-ghost btn-icon" id="btnConfig" type="button" aria-label="Configurações" title="Configurações">
+      <svg class="ic"><use href="#ic-cog"/></svg>
     </button>
     <span class="topbar-divider"></span>
     <button class="btn" id="btnExport" type="button" data-busy-disable aria-label="Exportar para Excel" title="Exportar para Excel">
@@ -976,6 +1057,18 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     O envio fica disponível assim que uma conta Instagram for ligada.</span>
   </div>
 
+  <div class="o-sessao" id="oSessionBar" hidden>
+    <svg class="ic"><use href="#ic-check"/></svg>
+    <span>Sessão de <b id="oSessaoQuem">—</b></span>
+    <span class="o-sessao-tag" id="oSessaoModo">dados no servidor</span>
+    <div class="o-spacer"></div>
+    <button class="btn btn-sm" type="button" id="oBtnMigrar">Migrar dados locais</button>
+    <button class="btn btn-sm" type="button" id="oBtnSair">Sair</button>
+  </div>
+
+  <div id="oGate" hidden></div>
+
+  <div id="oApp">
   <div class="o-tabs" role="tablist" aria-label="Secções do Outreach">
     <button type="button" role="tab" data-otab="dashboard" aria-controls="oPanel-dashboard" id="oTabBtn-dashboard" aria-selected="true">Dashboard</button>
     <button type="button" role="tab" data-otab="contactos" aria-controls="oPanel-contactos" id="oTabBtn-contactos" aria-selected="false">Contactos<span class="o-tab-n" id="nContactos">0</span></button>
@@ -1049,9 +1142,24 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <div class="o-head">
       <h2>Contas Instagram</h2>
       <span class="o-dim" id="oContasLimite"></span><div class="o-spacer"></div>
-      <button class="btn btn-primary btn-sm" type="button" id="oBtnNovaConta">Ligar conta</button>
+      <button class="btn btn-primary btn-sm" type="button" id="oBtnNovaConta">Registar conta</button>
     </div>
     <div class="o-grid" id="oContasGrid"></div>
+
+    <div class="o-card o-mc" id="oManyChat">
+      <div class="o-head" style="margin-bottom:12px">
+        <h3 style="margin:0;font-size:15px">ManyChat</h3>
+        <span class="o-status" id="oMcEstado">por verificar</span>
+        <div class="o-spacer"></div>
+        <button class="btn btn-sm" type="button" id="oMcTestar">Testar conexão</button>
+      </div>
+      <p class="o-dim" style="margin:0 0 12px;font-size:12.5px">
+        O LeadMap fala com a ManyChat, e a ManyChat com o Instagram. O token vive só no backend —
+        nunca passa por este browser.
+      </p>
+      <div id="oMcDetalhe"></div>
+      <div id="oMcFlows"></div>
+    </div>
   </section>
 
   <!-- Fila -->
@@ -1068,6 +1176,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="o-pager" id="oPagerFila"></div>
     </div>
   </section>
+  </div><!-- /oApp -->
 </div><!-- /outreachView -->
 
 </main>
@@ -1220,6 +1329,16 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <small class="ferr" id="err-oContaUser" role="alert" hidden></small>
           <div class="fhint">Nunca é pedida a palavra-passe do Instagram.</div>
         </div>
+        <div class="field">
+          <label for="oContaProvider">Provider</label>
+          <select class="tsel" id="oContaProvider" style="width:100%" aria-describedby="oContaProviderDesc">
+            <option value="meta">Meta Oficial</option>
+            <option value="manychat">ManyChat</option>
+            <option value="external">API Externa</option>
+          </select>
+          <div class="fhint" id="oContaProviderDesc"></div>
+          <div class="o-warn" id="oContaProviderAviso" hidden role="status"></div>
+        </div>
       </div>
       <div class="modal-foot">
         <span class="modal-note"></span>
@@ -1295,6 +1414,60 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <div class="modal-foot">
       <span class="modal-note" id="oDetNota"></span>
       <button class="btn" type="button" data-close>Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Configurações → Integrações -->
+<div class="modal-backdrop" id="modalConfig" role="presentation">
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="cfgTitle">
+    <div class="modal-head">
+      <h2 id="cfgTitle">Configurações</h2>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" data-close aria-label="Fechar"><svg class="ic"><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <h3 class="cfg-sub">Integrações</h3>
+      <p class="cfg-nota">Os segredos vivem só nas variáveis de ambiente do backend. Esta página mostra
+      <b>se</b> estão definidos — nunca o que valem.</p>
+      <div id="cfgLista"></div>
+      <div id="cfgFlows"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="modal-note" id="cfgAmbiente"></span>
+      <button class="btn btn-sm" type="button" id="cfgAtualizar">Atualizar</button>
+      <button class="btn" type="button" data-close>Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: envio de teste ManyChat (Fase E — §13/§14) -->
+<div class="modal-backdrop" id="oModalEnvioTeste" role="presentation">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="oEtTitle">
+    <div class="modal-head">
+      <h2 id="oEtTitle">Envio de teste — ManyChat</h2>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" data-close aria-label="Fechar"><svg class="ic"><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal-body" id="oEtBody"></div>
+    <div class="modal-foot">
+      <span class="modal-note">Um subscriber, uma automação, um envio.</span>
+      <button class="btn" type="button" data-close>Cancelar</button>
+      <button class="btn btn-primary" type="button" id="oEtOk" disabled>Confirmar e enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: migração de dados locais para o servidor (Fase D) -->
+<div class="modal-backdrop" id="oModalMigrar" role="presentation">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="oMigTitle">
+    <div class="modal-head">
+      <h2 id="oMigTitle">Migrar dados desta máquina</h2>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" data-close aria-label="Fechar"><svg class="ic"><use href="#ic-x"/></svg></button>
+    </div>
+    <div class="modal-body" id="oMigBody"></div>
+    <div class="modal-foot">
+      <span class="modal-note">Os dados locais não são apagados.</span>
+      <button class="btn" type="button" data-close>Cancelar</button>
+      <button class="btn btn-primary" type="button" id="oMigOk">Migrar agora</button>
     </div>
   </div>
 </div>
@@ -3697,6 +3870,227 @@ function showDemoBanner() {
     IS_FILE ? null : [{ label: 'Pesquisar dados reais agora', icon: 'search', onClick: () => runSearch({ ...defaultDemoParams(), demo: false }) }]);
 }
 
+/* =====================================================================
+   CONFIGURAÇÕES → INTEGRAÇÕES
+   ---------------------------------------------------------------------
+   Mostra o que está configurado. Nunca o valor de nada: um prefixo de
+   token é um token parcialmente vazado, e mascarar dá a ilusão de ser
+   seguro. Por isso não há campo para colar chaves — o gestor de segredos
+   continua a ser a Vercel, e o que esta página oferece é o nome da
+   variável para copiar.
+   ===================================================================== */
+
+const CFG = { integracoes: [], manychat: null, base: null, flows: null, providers: null, meta: null };
+
+async function cfgPedir(caminho) {
+  const r = await fetch('/api/outreach/' + caminho, { credentials: 'same-origin' });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || (j && j.success === false)) {
+    const e = new Error((j && j.message) || ('HTTP ' + r.status));
+    e.errorCode = (j && j.errorCode) || null;
+    e.status = r.status;
+    throw e;
+  }
+  return j || {};
+}
+
+async function abrirConfiguracoes() {
+  openModal($('#modalConfig'));
+  $('#cfgFlows').innerHTML = '';
+  CFG.flows = null;
+  await cfgCarregar();
+}
+
+async function cfgCarregar() {
+  const lista = $('#cfgLista');
+  lista.innerHTML = '<p class="cfg-nota">A consultar o backend…</p>';
+  try {
+    const r = await cfgPedir('integrations');
+    CFG.integracoes = r.integracoes || [];
+    $('#cfgAmbiente').textContent = 'Ambiente: ' + (r.environment || '—');
+    /* capacidades e estado de ligação por fornecedor — falha aqui não
+       deve tirar a página do ar, por isso é tolerada em silêncio */
+    try { CFG.providers = (await cfgPedir('providers')).providers || null; }
+    catch (e) { CFG.providers = null; }
+  } catch (err) {
+    /* §14: sem backend a página continua a funcionar e diz o que sabe */
+    CFG.integracoes = [];
+    lista.innerHTML = '<div class="cfg-card"><div class="cfg-topo">' +
+      '<span class="cfg-luz erro"></span><span class="cfg-nome">Backend indisponível</span></div>' +
+      '<p class="cfg-desc">' + esc(err.message) + '</p></div>';
+    return;
+  }
+  cfgRender();
+}
+
+function cfgEstadoTexto(i) {
+  if (i.id === 'manychat' && CFG.manychat) {
+    const m = { CONNECTED: ['Conectado', 'on'], NOT_CONFIGURED: ['Não configurado', ''],
+                UNAUTHORIZED: ['Token inválido', 'erro'], RATE_LIMITED: ['Limite atingido', 'erro'],
+                PROVIDER_ERROR: ['Erro', 'erro'] }[CFG.manychat.status];
+    if (m) return m;
+  }
+  if (i.id === 'manychat-meta-placeholder') { /* nunca acontece */ }
+  if (i.id === 'meta' && CFG.meta) {
+    const m = {
+      NOT_CONFIGURED: ['Não configurado', ''], CONFIGURED: ['Configurado, por validar', ''],
+      CONNECTION_VALIDATED: ['Ligação validada', 'on'],
+      READY_FOR_CONTROLLED_TEST: ['Pronta para teste controlado', 'on'],
+      ERROR: ['Erro', 'erro']
+    }[CFG.meta.estado];
+    if (m) return m;
+  }
+  if (i.id === 'outreach-db' && CFG.base) {
+    if (CFG.base.disponivel) return ['Configurada e disponível', 'on'];
+    return ['Configurada, mas não respondeu', 'erro'];
+  }
+  if (i.semChave) return ['Pronto · sem chave', 'on'];
+  return i.configurada ? ['Configurado', 'on'] : ['Não configurado', ''];
+}
+
+function cfgRender() {
+  const lista = $('#cfgLista');
+  if (!CFG.integracoes.length) { lista.innerHTML = '<p class="cfg-nota">Nenhuma integração declarada.</p>'; return; }
+
+  lista.innerHTML = CFG.integracoes.map(i => {
+    const [texto, cls] = cfgEstadoTexto(i);
+    const envs = i.variaveis.map(n =>
+      '<button class="cfg-env' + (i.emFalta.includes(n) ? ' falta' : '') + '" type="button" data-copiar="' + esc(n) + '" ' +
+      'title="Copiar o nome da variável">' + esc(n) + (i.emFalta.includes(n) ? ' · em falta' : '') + '</button>').join('');
+
+    let acoes = '';
+    if (i.id === 'manychat') {
+      acoes = '<div class="cfg-acoes">' +
+        '<button class="btn btn-sm" type="button" id="cfgMcTestar"' + (i.configurada ? '' : ' disabled') + '>Testar conexão</button>' +
+        '<button class="btn btn-sm" type="button" id="cfgMcFlows"' +
+          (CFG.manychat && CFG.manychat.status === 'CONNECTED' ? '' : ' disabled') + '>Ver automações</button>' +
+        '</div>';
+    } else if (i.id === 'meta') {
+      acoes = '<div class="cfg-acoes">' +
+        '<button class="btn btn-sm" type="button" id="cfgMetaTestar"' + (i.configurada ? '' : ' disabled') + '>Testar ligação</button>' +
+        '</div>';
+    } else if (i.id === 'outreach-db' && i.configurada) {
+      acoes = '<div class="cfg-acoes"><button class="btn btn-sm" type="button" id="cfgDbProbe">Testar base de dados</button></div>';
+    }
+
+    let detalhe = '';
+    if (i.id === 'manychat' && CFG.manychat) {
+      if (CFG.manychat.page) detalhe = '<div class="cfg-detalhe">Conta: <b>' + esc(CFG.manychat.page.name) + '</b> · ID ' + esc(String(CFG.manychat.page.id)) + '</div>';
+      else if (CFG.manychat.message) detalhe = '<div class="cfg-detalhe">' + esc(CFG.manychat.message) + '</div>';
+    }
+    if (i.id === 'meta') {
+      if (CFG.meta && CFG.meta.conta) {
+        const c = CFG.meta.conta;
+        detalhe = '<div class="cfg-detalhe">Conta: <b>@' + esc(c.username || '—') + '</b>' +
+          (c.nome ? ' · ' + esc(c.nome) : '') +
+          ' · tipo ' + esc(c.tipo || '—') +
+          '<br>Account ID: <code>' + esc(c.idMascarado || '—') + '</code>' +
+          (CFG.meta.testadoEm ? '<br>Último teste: ' + esc(new Date(CFG.meta.testadoEm).toLocaleString('pt-PT')) : '') +
+          '</div>';
+      } else if (CFG.meta && CFG.meta.mensagem) {
+        detalhe = '<div class="cfg-detalhe">' + esc(CFG.meta.mensagem) + '</div>';
+      } else if (!i.configurada) {
+        detalhe = '<div class="cfg-detalhe">Defina <code>INSTAGRAM_META_ACCESS_TOKEN</code> nas Environment Variables ' +
+                  'da Vercel (ou em <code>.env.local</code>). O envio continua bloqueado até a ligação ser validada.</div>';
+      }
+    }
+    if (i.id === 'external') {
+      const p = (CFG.providers || []).find(x => x.id === 'external');
+      if (p) {
+        detalhe = '<div class="cfg-detalhe">' +
+          'Fornecedor: <b>' + esc(p.fornecedor || 'nenhum') + '</b>' +
+          ' · autenticação: ' + esc(p.authType || '—') +
+          '<br>' + (p.configurado ? 'Configurado.' : 'Não configurado.') +
+          ' O host e a credencial vivem só no backend.</div>';
+      }
+    }
+    if (i.id === 'outreach-db' && CFG.base && CFG.base.erro) {
+      detalhe = '<div class="cfg-detalhe">' + esc(CFG.base.erro) + '</div>';
+    }
+    if (i.id === 'manychat' && !i.configurada) {
+      detalhe = '<div class="cfg-detalhe">Defina <code>MANYCHAT_API_TOKEN</code> nas Environment Variables da Vercel ' +
+                '(ou em <code>.env.local</code>, para desenvolvimento). Não há aqui campo para colar o token, de propósito.</div>';
+    }
+
+    return '<div class="cfg-card">' +
+      '<div class="cfg-topo"><span class="cfg-luz ' + cls + '"></span>' +
+        '<span class="cfg-nome">' + esc(i.nome) + '</span>' +
+        '<span class="cfg-estado">' + esc(texto) + '</span></div>' +
+      '<p class="cfg-desc">' + esc(i.descricao) + '</p>' +
+      (envs ? '<div class="cfg-envs">' + envs + '</div>' : '') +
+      detalhe + acoes +
+    '</div>';
+  }).join('');
+
+  lista.querySelectorAll('[data-copiar]').forEach(b =>
+    b.addEventListener('click', () => cfgCopiar(b.dataset.copiar)));
+  const t = $('#cfgMcTestar'); if (t) t.addEventListener('click', cfgTestarManyChat);
+  const f = $('#cfgMcFlows'); if (f) f.addEventListener('click', cfgVerFlows);
+  const d = $('#cfgDbProbe'); if (d) d.addEventListener('click', cfgTestarBase);
+  const mt = $('#cfgMetaTestar'); if (mt) mt.addEventListener('click', cfgTestarMeta);
+}
+
+/** Copia o NOME da variável. Nunca há um valor por perto para copiar. */
+async function cfgCopiar(nome) {
+  try {
+    await navigator.clipboard.writeText(nome);
+    toast('Copiado: ' + nome, 'success', 3500);
+  } catch (e) {
+    toast('Não foi possível copiar. O nome é: ' + nome, 'info', 6000);
+  }
+}
+
+async function cfgTestarManyChat() {
+  const b = $('#cfgMcTestar'); if (b) b.disabled = true;
+  try {
+    const r = await cfgPedir('manychat?action=test');
+    CFG.manychat = r.manychat;
+  } catch (err) {
+    CFG.manychat = { status: err.status === 401 ? 'UNAUTHORIZED' : 'PROVIDER_ERROR', page: null,
+                     message: err.status === 401 ? 'Precisa de entrar na área de Outreach.' : err.message };
+  }
+  cfgRender();
+}
+
+async function cfgVerFlows() {
+  const alvo = $('#cfgFlows');
+  alvo.innerHTML = '<p class="cfg-nota">A carregar automações…</p>';
+  try {
+    const r = await cfgPedir('manychat?action=flows');
+    CFG.flows = r.flows || [];
+    alvo.innerHTML = CFG.flows.length
+      ? '<h3 class="cfg-sub" style="margin-top:20px">Automações ManyChat</h3>' +
+        CFG.flows.map(f => '<div class="o-mc-flow"><b>' + esc(f.name || 'Sem nome') + '</b>' +
+          '<code>' + esc(f.ns) + '</code></div>').join('')
+      : '<p class="cfg-nota" style="margin-top:20px">A conta não tem automações.</p>';
+  } catch (err) {
+    alvo.innerHTML = '<p class="cfg-nota" style="margin-top:20px">Não foi possível listar: ' + esc(err.message) + '</p>';
+  }
+}
+
+async function cfgTestarMeta() {
+  const b = $('#cfgMetaTestar'); if (b) b.disabled = true;
+  try {
+    CFG.meta = (await cfgPedir('meta-test')).meta;
+  } catch (err) {
+    CFG.meta = { estado: err.status === 401 ? 'ERROR' : 'ERROR', conta: null,
+                 mensagem: err.status === 401 ? 'Precisa de entrar na área de Outreach.' : err.message };
+  }
+  cfgRender();
+}
+
+async function cfgTestarBase() {
+  const b = $('#cfgDbProbe'); if (b) b.disabled = true;
+  try {
+    const r = await cfgPedir('db-probe');
+    CFG.base = r.base;
+  } catch (err) {
+    CFG.base = { configurada: true, disponivel: false,
+                 erro: err.status === 401 ? 'Precisa de entrar na área de Outreach.' : (err.errorCode || err.message) };
+  }
+  cfgRender();
+}
+
 let confirmResolve = null;
 function confirmDialog(opts) {
   $('#confirmTitle').textContent = opts.title || 'Confirmar';
@@ -3851,6 +4245,11 @@ function bindEvents() {
   }));
 
   /* Modal de confirmação */
+  $('#btnConfig').addEventListener('click', abrirConfiguracoes);
+  $('#cfgAtualizar').addEventListener('click', cfgCarregar);
+  $$('#modalConfig [data-close]').forEach(b => b.addEventListener('click', () => closeModal($('#modalConfig'))));
+  $('#modalConfig').addEventListener('mousedown', e => { if (e.target === e.currentTarget) closeModal($('#modalConfig')); });
+
   $('#confirmOk').addEventListener('click', () => settleConfirm(true));
   $('#confirmCancel').addEventListener('click', () => settleConfirm(false));
   $$('#confirmModal [data-close]').forEach(b => b.addEventListener('click', () => settleConfirm(false)));
@@ -4384,9 +4783,15 @@ else init();
 
 let O = null;          /* módulo de domínio */
 let IG = null;         /* módulo Instagram da Fase A */
-let store = null;
+let store = null;      /* LocalOutreachStore — migração e cópia de segurança */
 let est = null;
 let mockProvider = null;
+
+/* --- Fase D: sessão e armazenamento remoto --- */
+let GATE = null;       /* módulo session-gate */
+let remoto = null;     /* RemoteOutreachStore */
+let sessao = null;     /* SessaoOutreach */
+let MODO = 'local';    /* 'local' | 'remoto' — nunca ambíguo */
 
 const OUT = {
   aba: 'dashboard',
@@ -4405,12 +4810,24 @@ async function iniciarOutreach() {
     IG = await import('./providers/instagram/index.mjs');
     O = await import('./providers/outreach/model.mjs');
     const S = await import('./providers/outreach/store.mjs');
+    /* O LocalOutreachStore continua a existir, mas a partir da Fase D só
+       serve para três coisas: detetar dados antigos nesta máquina, mostrar
+       a previsão da migração e executá-la. Nunca é o estado de trabalho. */
     store = new S.LocalOutreachStore({ estadoInicial: O.estadoInicial });
-    est = store.load();
+    est = O.estadoInicial();
     mockProvider = new IG.MockInstagramProvider({ script: {} });
+
+    /* Fase D: quem manda no que se vê é o backend, não o browser */
+    const RS = await import('./providers/outreach/remote-store.mjs');
+    GATE = await import('./providers/outreach/session-gate.mjs');
+    remoto = new RS.RemoteOutreachStore({});
+    sessao = new GATE.SessaoOutreach({ remoto });
+
     ligarEventosOutreach();
+    ligarEventosSessao();
     renderOutreach();
     if (store.ultimoErro) toast('Outreach: ' + store.ultimoErro, 'warn', 6000);
+    avaliarSessao();
   } catch (err) {
     console.warn('[Outreach] módulos indisponíveis', err);
     const v = $('#outreachView');
@@ -4426,8 +4843,488 @@ async function iniciarOutreach() {
 }
 
 function guardar() {
+  /* Em sessão remota o dono dos dados é o servidor. Se alguma coisa
+     chegar aqui é um caminho de escrita que ficou por ligar — e é melhor
+     dar erro à vista do que gravar em silêncio no sítio errado. */
+  if (MODO === 'remoto') {
+    console.error('[Outreach] tentativa de gravação local durante sessão remota');
+    toast('Esta ação ainda não está ligada ao servidor e não foi guardada.', 'error', 8000);
+    return;
+  }
   try { store.save(est); }
   catch (err) { console.error('[Outreach] gravação recusada', err); toast(err.message, 'error', 7000); }
+}
+
+/* =====================================================================
+   FASE D — porta de sessão
+   ---------------------------------------------------------------------
+   Uma sessão autenticada trabalha SEMPRE contra o servidor. Se o
+   servidor falhar, mostra-se o erro; nunca se mostram os dados locais
+   com ar de remotos, porque a pessoa editaria uma realidade que não
+   existe e as duas versões separavam-se em silêncio.
+   ===================================================================== */
+
+let estadoGate = null;
+
+function mostrarApp(sim) {
+  const app = $('#oApp'); if (app) app.hidden = !sim;
+  const gate = $('#oGate'); if (gate) gate.hidden = sim;
+}
+
+function barraSessao(quem, etiqueta, podeMigrar) {
+  const barra = $('#oSessionBar');
+  if (!barra) return;
+  barra.hidden = !quem && !etiqueta;
+  if (barra.hidden) return;
+  $('#oSessaoQuem').textContent = quem || '—';
+  $('#oSessaoModo').textContent = etiqueta;
+  $('#oBtnSair').hidden = MODO !== 'remoto';
+  $('#oBtnMigrar').hidden = !podeMigrar;
+}
+
+async function avaliarSessao() {
+  if (!sessao) return;
+  const gate = $('#oGate');
+  if (gate) gate.innerHTML = '<div class="o-gate"><div class="o-card"><div class="o-empty">' +
+    '<h3>A verificar…</h3><p>A perguntar ao servidor em que estado está o Outreach.</p></div></div></div>';
+  mostrarApp(false);
+  barraSessao(null, null, false);
+
+  estadoGate = await sessao.avaliar();
+  const E = GATE.ESTADO_UI;
+
+  if (estadoGate === E.PRONTO) {
+    MODO = 'remoto';
+    return carregarRemoto();
+  }
+  MODO = 'local';
+  desenharGate(estadoGate);
+}
+
+function desenharGate(estado) {
+  const E = GATE.ESTADO_UI;
+  const m = GATE.MENSAGEM[estado] || GATE.MENSAGEM[E.INDISPONIVEL];
+  const gate = $('#oGate');
+  if (!gate) return;
+
+  if (estado === E.LOGIN) {
+    gate.innerHTML =
+      '<div class="o-gate"><div class="o-card">' +
+        '<h3>' + esc(m.titulo) + '</h3><p>' + esc(m.texto) + '</p>' +
+        '<form id="oFormLogin" autocomplete="on">' +
+          '<label for="oLoginEmail">Email do operador</label>' +
+          '<input class="tinput" type="email" id="oLoginEmail" name="email" autocomplete="username" required>' +
+          '<label for="oLoginPass">Password</label>' +
+          '<input class="tinput" type="password" id="oLoginPass" name="password" autocomplete="current-password" required>' +
+          '<p class="o-erro" id="oLoginErro" role="alert"></p>' +
+          '<div class="o-gate-acoes">' +
+            '<button class="btn btn-primary" type="submit" id="oLoginBtn">Entrar</button>' +
+          '</div>' +
+        '</form>' +
+      '</div></div>';
+    $('#oFormLogin').addEventListener('submit', submeterLogin);
+    setTimeout(() => { const c = $('#oLoginEmail'); if (c) c.focus(); }, 30);
+    return;
+  }
+
+  /* Não há vista local. Operar contactos, templates ou campanhas fora do
+     servidor criaria uma segunda verdade que ninguém volta a reconciliar;
+     os dados desta máquina só existem para serem migrados. */
+  const local = contagemLocal();
+  gate.innerHTML =
+    '<div class="o-gate"><div class="o-card"><div class="o-empty">' +
+      '<h3>' + esc(m.titulo) + '</h3><p>' + esc(m.texto) + '</p>' +
+      (local.total
+        ? '<p class="o-dim" style="font-size:12.5px">Há ' + nf(local.total) + ' registos guardados nesta máquina. ' +
+          'Continuam intactos e poderá migrá-los depois de entrar.</p>'
+        : '') +
+      '<div class="o-gate-acoes" style="justify-content:center">' +
+        '<button class="btn btn-sm" type="button" id="oGateRetry">Verificar de novo</button>' +
+      '</div>' +
+    '</div></div></div>';
+  $('#oGateRetry').addEventListener('click', avaliarSessao);
+}
+
+/** Quantos registos antigos existem nesta máquina, só para os anunciar. */
+function contagemLocal() {
+  try {
+    const p = GATE.preverMigracao(store.load());
+    return { total: p.migravel.contactos + p.migravel.templates + p.migravel.campanhasDraft, previsao: p };
+  } catch (e) { return { total: 0, previsao: null }; }
+}
+
+async function submeterLogin(ev) {
+  ev.preventDefault();
+  const btn = $('#oLoginBtn'), erro = $('#oLoginErro');
+  const email = $('#oLoginEmail').value.trim();
+  const password = $('#oLoginPass').value;
+  btn.disabled = true; erro.textContent = '';
+  try {
+    await sessao.entrar(email, password);
+    /* a password sai da memória do formulário assim que deixa de ser precisa */
+    $('#oLoginPass').value = '';
+    if (sessao.estado === GATE.ESTADO_UI.PRONTO) { MODO = 'remoto'; await carregarRemoto(); }
+    else desenharGate(sessao.estado);
+  } catch (err) {
+    erro.textContent = (err && err.status === 429)
+      ? 'Demasiadas tentativas. Aguarde alguns minutos.'
+      : 'Credenciais inválidas.';
+    $('#oLoginPass').value = '';
+    btn.disabled = false;
+  }
+}
+
+/** Enche `est` a partir do servidor. Falha visível, nunca dados locais. */
+async function carregarRemoto() {
+  try {
+    const d = await sessao.hidratar({ limitePagina: OUT.porPagina });
+    est = {
+      versao: 2, remoto: true, seq: 0,
+      contactos: d.contactos.map(mapearContactoRemoto),
+      contas: d.contas.map(mapearContaRemota),
+      templates: d.templates.map(t => ({
+        id: t.id, nome: t.name, mensagem: t.body,
+        criadoEm: t.createdAt || null, atualizadoEm: t.updatedAt || null
+      })),
+      campanhas: d.campanhas.map(k => ({
+        id: k.id, nome: k.name, status: k.status || 'DRAFT',
+        contaId: k.accountId || null, templateId: k.templateId || null, mensagem: k.body || '',
+        criadaEm: k.createdAt || null, contactos: [], totais: {}
+      })),
+      fila: d.fila, mensagens: []
+    };
+    est.totalContactos = d.totalContactos;
+    /* capacidades por fornecedor, para o cartão da conta não inventar */
+    try {
+      const rp = await fetch('/api/outreach/providers', { credentials: 'same-origin' });
+      MC.providers = rp.ok ? (await rp.json()).providers || [] : [];
+    } catch (e) { MC.providers = []; }
+    barraSessao(sessao.info.subject || 'operador', 'dados no servidor', contagemLocal().total > 0);
+    mostrarApp(true);
+    renderOutreach();
+  } catch (err) {
+    /* Nada de dados antigos à vista: a pessoa tem de saber que o que
+       está no ecrã já não corresponde ao servidor. */
+    MODO = 'remoto';
+    est = O.estadoInicial ? O.estadoInicial() : { contactos: [], contas: [], templates: [], campanhas: [], fila: [], mensagens: [] };
+    mostrarApp(false);
+    barraSessao(sessao.info.subject || 'operador', 'sem ligação', false);
+    desenharGate(GATE.ESTADO_UI.INDISPONIVEL);
+  }
+}
+
+/* A forma tem de ser exatamente a que as vistas já esperam — `status`,
+   e `campanhas` como array. Um campo em falta não dá erro visível: a
+   linha rebenta a meio e a tabela aparece vazia como se não houvesse
+   dados. */
+function mapearContactoRemoto(c) {
+  return {
+    id: c.id, leadId: c.leadId || null, nome: c.name || 'Sem nome',
+    instagram: c.normalizedInstagram || null, temInstagram: Boolean(c.normalizedInstagram),
+    empresa: c.company || null, cidade: c.city || null, distrito: c.district || null,
+    atividade: c.activity || null, origem: c.source || null,
+    /* os dois campos por onde a ManyChat deixa procurar */
+    email: c.email || null, telemovel: c.phone || null,
+    status: c.status || 'UNKNOWN',
+    optOut: c.status === 'OPTED_OUT',
+    campanhas: Array.isArray(c.campaigns) ? c.campaigns : [],
+    ultimaAcao: c.updatedAt || c.createdAt || null
+  };
+}
+function mapearContaRemota(a) {
+  return {
+    id: a.id, username: a.username, nome: a.displayName || a.username,
+    provider: a.provider || 'not_configured',
+    /* nesta fase uma conta é um registo, não uma ligação ao Instagram */
+    status: a.status || 'REGISTADA',
+    ligadaEm: a.createdAt || null,
+    capacidades: a.capabilities || {},
+    enviadasHoje: 0, enviadasHora: 0
+  };
+}
+
+function ligarEventosSessao() {
+  const sair = $('#oBtnSair');
+  if (sair) sair.addEventListener('click', async () => {
+    await sessao.sair();
+    est = O.estadoInicial();     /* nada fica no ecrã depois de sair */
+    MODO = 'local';
+    toast('Sessão terminada. Os dados locais continuam guardados.', 'info', 5000);
+    avaliarSessao();
+  });
+  const mcT = $('#oMcTestar');
+  if (mcT) mcT.addEventListener('click', mcTestarLigacao);
+  const mcF = $('#oMcFlows');
+  if (mcF) mcF.addEventListener('click', e => {
+    const b = e.target.closest('.o-mc-testar-flow');
+    if (b) mcAbrirEnvioTeste(b.dataset.ns);
+  });
+  const et = $('#oEtOk');
+  if (et) et.addEventListener('click', mcConfirmarEnvio);
+
+  const mig = $('#oBtnMigrar');
+  if (mig) mig.addEventListener('click', abrirMigracao);
+}
+
+/* =====================================================================
+   ManyChat — testar ligação, listar automações, envio de teste
+   ---------------------------------------------------------------------
+   Tudo passa pelo backend: o browser nunca fala com api.manychat.com e
+   nunca vê o token. E nada aqui adivinha destinatários — um @instagram
+   que o LeadMap encontrou não é um subscriber da ManyChat enquanto a
+   própria API não o confirmar.
+   ===================================================================== */
+
+const MC = { estado: null, flows: [], subscriber: null, flowNs: null, metaEstado: null, providers: [] };
+
+async function mcPedir(caminho, opcoes = {}) {
+  const resp = await fetch('/api/outreach/manychat' + caminho, {
+    credentials: 'same-origin',
+    method: opcoes.metodo || 'GET',
+    headers: opcoes.corpo ? { 'Content-Type': 'application/json' } : {},
+    body: opcoes.corpo ? JSON.stringify(opcoes.corpo) : undefined
+  });
+  const j = await resp.json().catch(() => null);
+  if (!resp.ok || (j && j.success === false)) {
+    const e = new Error((j && j.message) || ('HTTP ' + resp.status));
+    e.errorCode = (j && j.errorCode) || null;
+    throw e;
+  }
+  return j || {};
+}
+
+const MC_ROTULO = {
+  CONNECTED: ['Ligada', 'ELIGIBLE'], NOT_CONFIGURED: ['Sem token', 'UNKNOWN'],
+  UNAUTHORIZED: ['Token recusado', 'OPTED_OUT'], RATE_LIMITED: ['Limite atingido', 'NOT_ELIGIBLE'],
+  PROVIDER_ERROR: ['Erro do fornecedor', 'OPTED_OUT']
+};
+
+async function mcTestarLigacao() {
+  const btn = $('#oMcTestar'); const cx = $('#oMcEstado');
+  if (btn) btn.disabled = true;
+  if (cx) { cx.textContent = 'a verificar…'; cx.className = 'o-status'; }
+  try {
+    const r = await mcPedir('?action=test');
+    MC.estado = r.manychat;
+    mcRenderEstado();
+    if (MC.estado.status === 'CONNECTED') await mcCarregarFlows();
+  } catch (err) {
+    MC.estado = { status: 'PROVIDER_ERROR', page: null, message: err.message };
+    mcRenderEstado();
+  } finally { if (btn) btn.disabled = false; }
+}
+
+function mcRenderEstado() {
+  const e = MC.estado || { status: 'NOT_CONFIGURED' };
+  const [texto, cls] = MC_ROTULO[e.status] || [e.status, 'UNKNOWN'];
+  const cx = $('#oMcEstado');
+  if (cx) { cx.textContent = texto; cx.className = 'o-status s-' + cls; }
+
+  const linha = (r, v) => '<div class="o-mc-linha"><span>' + esc(r) + '</span><span>' + v + '</span></div>';
+  let html = '';
+  if (e.status === 'CONNECTED' && e.page) {
+    html += linha('Página', '<b>' + esc(e.page.name || '—') + '</b>');
+    html += linha('ID', '<code>' + esc(String(e.page.id)) + '</code>');
+    if (e.page.username) html += linha('Utilizador', '@' + esc(e.page.username));
+    html += linha('Plano Pro', e.page.isPro ? 'sim' : 'não');
+  } else if (e.status === 'NOT_CONFIGURED') {
+    html += '<p class="o-dim" style="font-size:12.5px;margin:0">Falta <code>MANYCHAT_API_TOKEN</code> nas ' +
+            'variáveis de ambiente do backend. Configure-a na Vercel ou em <code>.env.local</code> — ' +
+            'nunca aqui, nunca no browser.</p>';
+  } else if (e.message) {
+    html += '<p class="o-dim" style="font-size:12.5px;margin:0">' + esc(e.message) + '</p>';
+  }
+  const d = $('#oMcDetalhe'); if (d) d.innerHTML = html;
+}
+
+async function mcCarregarFlows() {
+  const alvo = $('#oMcFlows');
+  if (!alvo) return;
+  alvo.innerHTML = '<p class="o-dim" style="font-size:12.5px">A carregar automações…</p>';
+  try {
+    const r = await mcPedir('?action=flows');
+    MC.flows = r.flows || [];
+    if (!MC.flows.length) {
+      alvo.innerHTML = '<p class="o-dim" style="font-size:12.5px">A conta ManyChat não tem automações. ' +
+        'Crie uma em app.manychat.com — o LeadMap dispara automações, não as escreve.</p>';
+      return;
+    }
+    alvo.innerHTML = '<p style="font-size:13px;font-weight:600;margin:16px 0 2px">Automações desta conta</p>' +
+      MC.flows.map(f =>
+        '<div class="o-mc-flow"><b>' + esc(f.name || 'Sem nome') + '</b>' +
+        '<code>' + esc(f.ns) + '</code><div class="o-spacer"></div>' +
+        '<button class="btn btn-sm o-mc-testar-flow" type="button" data-ns="' + esc(f.ns) + '">Envio de teste</button></div>'
+      ).join('');
+  } catch (err) {
+    alvo.innerHTML = '<p class="o-dim" style="font-size:12.5px">Não foi possível listar automações: ' + esc(err.message) + '</p>';
+  }
+}
+
+/* ---------- envio de teste (§13/§14) ---------- */
+
+function mcAbrirEnvioTeste(flowNs) {
+  MC.flowNs = flowNs;
+  MC.subscriber = null;
+  const flow = MC.flows.find(f => f.ns === flowNs);
+  $('#oEtOk').disabled = true;
+  $('#oEtBody').innerHTML =
+    '<div class="o-et">' +
+      '<p class="o-dim" style="margin-top:0;font-size:13px">Um envio, um subscriber, uma automação. ' +
+      'O LeadMap não procura pessoas pelo Instagram: a ManyChat não oferece essa pesquisa. ' +
+      'Indique o <b>subscriber ID</b> de alguém que já falou consigo na ManyChat.</p>' +
+      '<div class="field"><label for="oEtSubId">Subscriber ID da ManyChat</label>' +
+        '<input class="tinput" type="text" id="oEtSubId" inputmode="numeric" placeholder="ex.: 987654321"></div>' +
+      '<div class="field"><label for="oEtIg">Instagram esperado (opcional, mas verifica-se)</label>' +
+        '<input class="tinput" type="text" id="oEtIg" placeholder="ex.: clinica_alfa"></div>' +
+      '<div class="o-gate-acoes" style="margin-bottom:14px">' +
+        '<button class="btn btn-sm" type="button" id="oEtVerificar">Verificar na ManyChat</button></div>' +
+      '<div id="oEtResumo"></div>' +
+      '<div class="o-aviso">Automação escolhida: <b>' + esc(flow ? flow.name : '—') + '</b><br>' +
+      '<code>' + esc(flowNs) + '</code></div>' +
+    '</div>';
+  $('#oEtVerificar').addEventListener('click', mcVerificarSubscriber);
+  openModal($('#oModalEnvioTeste'));
+}
+
+async function mcVerificarSubscriber() {
+  const id = $('#oEtSubId').value.trim();
+  const ig = $('#oEtIg').value.trim().replace(/^@/, '');
+  const alvo = $('#oEtResumo');
+  if (!id) { alvo.innerHTML = '<p class="o-erro">Indique o subscriber ID.</p>'; return; }
+  alvo.innerHTML = '<p class="o-dim">A verificar na ManyChat…</p>';
+  $('#oEtOk').disabled = true;
+  try {
+    const r = await mcPedir('?action=verify&subscriberId=' + encodeURIComponent(id) +
+                            '&instagram=' + encodeURIComponent(ig));
+    const v = r.verificacao;
+    MC.subscriber = v.subscriber;
+    const flow = MC.flows.find(f => f.ns === MC.flowNs);
+    const l = (k, val) => '<dt>' + esc(k) + '</dt><dd>' + esc(val || '—') + '</dd>';
+    /* §14: o resumo mostra exatamente para quem vai, antes de haver envio */
+    alvo.innerHTML =
+      '<dl>' +
+        l('Contacto', v.subscriber.name) +
+        l('Instagram', v.subscriber.igUsername ? '@' + v.subscriber.igUsername : null) +
+        l('Subscriber ID', v.subscriber.subscriberId) +
+        l('Última interação', v.subscriber.lastInteraction) +
+        l('Automação', flow ? flow.name : MC.flowNs) +
+        l('Fornecedor', 'ManyChat') +
+      '</dl>' +
+      (ig && !v.confirmado
+        ? '<p class="o-erro">' + esc(v.motivo || 'O Instagram não corresponde.') + ' O envio fica bloqueado.</p>'
+        : '<p class="o-dim" style="font-size:12.5px">Confirmado pela API da ManyChat.</p>');
+    /* só desbloqueia se a identidade bater certo (ou se não se pediu verificação) */
+    $('#oEtOk').disabled = Boolean(ig) && !v.confirmado;
+  } catch (err) {
+    MC.subscriber = null;
+    alvo.innerHTML = '<p class="o-erro">' + esc(err.message) + '</p>';
+  }
+}
+
+async function mcConfirmarEnvio() {
+  const btn = $('#oEtOk');
+  btn.disabled = true;
+  try {
+    const r = await mcPedir('?action=send-test', {
+      metodo: 'POST',
+      corpo: {
+        subscriberId: $('#oEtSubId').value.trim(),
+        flowNs: MC.flowNs,
+        instagram: $('#oEtIg').value.trim().replace(/^@/, '') || null,
+        confirmado: true
+      }
+    });
+    closeModal($('#oModalEnvioTeste'));
+    const e = r.envio || {};
+    if (e.success) {
+      /* QUEUED, não "enviado": a ManyChat aceitou o pedido, o que não é
+         o mesmo que o Instagram ter entregado */
+      toast('A ManyChat aceitou o pedido (estado: ' + esc(e.status) + '). Confirme no Instagram.', 'success', 9000);
+    } else {
+      toast('Não foi enviado: ' + esc(e.errorCode || 'erro') + ' — ' + esc(e.errorMessage || ''), 'error', 10000);
+    }
+  } catch (err) {
+    toast('Não foi enviado: ' + esc(err.message), 'error', 10000);
+    btn.disabled = false;
+  }
+}
+
+/* ---------- escritas em sessão remota ---------- */
+
+/**
+ * Executa uma escrita no servidor e recarrega o estado a partir dele.
+ *
+ * Recarregar em vez de remendar `est` à mão evita a classe de erro mais
+ * chata deste tipo de interface: a vista e a base de dados divergirem
+ * porque alguém se esqueceu de atualizar um campo derivado.
+ */
+async function escreverRemoto(accao, mensagemOk) {
+  try {
+    await accao();
+    await carregarRemoto();
+    if (mensagemOk) toast(mensagemOk, 'success');
+    return true;
+  } catch (err) {
+    toast('O servidor recusou: ' + (err.message || 'erro desconhecido'), 'error', 8000);
+    return false;
+  }
+}
+
+/**
+ * Ações que ainda não têm rota no backend.
+ *
+ * Dizê-lo em voz alta é melhor do que a alternativa: deixar o botão
+ * parecer funcionar e a alteração desaparecer no recarregamento seguinte.
+ */
+function escritaPorLigar(oQue) {
+  toast(oQue + ' ainda não tem rota no backend. Nada foi alterado.', 'warn', 7000);
+}
+
+/* ---------- migração local → remoto ---------- */
+
+function abrirMigracao() {
+  if (MODO !== 'remoto') { toast('Entre na sua conta antes de migrar.', 'warn'); return; }
+  const local = store.load();
+  const p = GATE.preverMigracao(local);
+  if (p.nada) { toast('Não há dados locais para migrar.', 'info', 5000); return; }
+
+  const linha = (t, v) => '<dt>' + esc(t) + '</dt><dd>' + nf(v) + '</dd>';
+  $('#oMigBody').innerHTML =
+    '<div class="o-migracao">' +
+      '<p class="o-dim" style="margin-top:0">Isto copia para o servidor o trabalho que fez nesta máquina. ' +
+      'Os dados locais <b>não</b> são apagados.</p>' +
+      '<dl>' + linha('Contactos', p.migravel.contactos) + linha('Templates', p.migravel.templates) +
+        linha('Campanhas em rascunho', p.migravel.campanhasDraft) + '</dl>' +
+      '<p style="font-weight:600;font-size:13px;margin:0 0 6px">Fica de fora</p>' +
+      '<dl class="ignorado">' +
+        linha('Mensagens de simulação', p.ignorado.mensagensSimuladas) +
+        linha('Itens de fila', p.ignorado.itensDeFila) +
+        linha('Campanhas já executadas', p.ignorado.campanhasJaExecutadas) +
+        linha('Contactos sem Instagram nem lead', p.ignorado.contactosSemIdentidade) +
+        linha('Contas locais', p.ignorado.contas) +
+      '</dl>' +
+      '<p class="o-dim" style="font-size:12.5px">Nada que tenha sido produzido pelo modo de demonstração ' +
+      'entra como atividade real.</p>' +
+    '</div>';
+
+  const ok = $('#oMigOk');
+  /* substituir o botão remove qualquer listener de uma abertura anterior */
+  const novo = ok.cloneNode(true);
+  ok.parentNode.replaceChild(novo, ok);
+  novo.addEventListener('click', async () => {
+    novo.disabled = true;
+    try {
+      const r = await GATE.executarMigracao(local, remoto, { confirmado: true });
+      closeModal($('#oModalMigrar'));
+      await carregarRemoto();
+      toast('Migração concluída: ' + r.resumo.contactos.criados + ' contactos e ' +
+            r.resumo.templates.criados + ' templates criados.', 'success', 7000);
+    } catch (err) {
+      toast('A migração falhou: ' + (err.message || 'erro desconhecido'), 'error', 8000);
+      novo.disabled = false;
+    }
+  });
+  openModal($('#oModalMigrar'));
 }
 
 /* ---------- navegação entre vistas ---------- */
@@ -4439,7 +5336,11 @@ function mostrarVista(qual) {
   $('#navLeads').setAttribute('aria-selected', String(!outreach));
   $('#navOutreach').setAttribute('aria-selected', String(outreach));
   $('#selBar').classList.toggle('hidden-view', outreach);
-  if (outreach) renderOutreach();
+  if (!outreach) return;
+  /* Reavaliar ao entrar: é aqui que se descobre uma sessão expirada ou
+     um backend que caiu entretanto. Sem isto, a vista continuava a
+     mostrar dados antigos como se estivessem vivos. */
+  if (sessao) avaliarSessao(); else renderOutreach();
 }
 
 function mostrarAba(nome) {
@@ -4666,28 +5567,104 @@ function renderContas() {
   $('#oBtnNovaConta').disabled = est.contas.length >= O.MAX_CONTAS;
 
   if (!est.contas.length) {
-    grid.innerHTML = '<div class="o-card">' + vazio('Sem contas ligadas',
-      'Ligue uma conta para preparar campanhas. Nunca é pedida a palavra-passe do Instagram.') + '</div>';
+    /* §38: uma conta aqui é um registo, não uma ligação. Dizer "ligada"
+       quando nada está ligado é a mentira mais fácil de cometer nesta
+       página — e a que mais custa a desfazer. */
+    grid.innerHTML = '<div class="o-card">' + vazio('Sem contas registadas',
+      'Registe uma conta para preparar campanhas. Nunca é pedida a palavra-passe do Instagram.') + '</div>';
     return;
   }
   const rotulos = {
     canSendMessage: 'Envio', canReadConversations: 'Conversas', canFetchProfile: 'Perfil',
-    canFetchDeliveryStatus: 'Delivery Status', canCheckEligibility: 'Elegibilidade', canReceiveWebhooks: 'Webhooks'
+    canFetchDeliveryStatus: 'Estado de entrega', canCheckEligibility: 'Elegibilidade',
+    canReceiveWebhooks: 'Webhooks',
+    canLookupByUsername: 'Procura por @perfil', canLookupByEmailOrPhone: 'Procura por email/telefone',
+    canInitiateFirstContact: 'Inicia conversa', requiresMessagingWindow: 'Sujeito a janela de 24 h',
+    canSendFlow: 'Automações', canSendFreeText: 'Texto livre'
   };
-  /* capacidades reais do fornecedor da Fase A — não uma segunda lista */
-  const caps = mockProvider.capabilities;
+  /* Capacidades do fornecedor DESTA conta. Mostrar sempre as do
+     fornecedor de teste dizia a mesma coisa a toda a gente — e dizia
+     coisas que a Meta e a ManyChat não fazem. */
+  const capsPorProvider = (MC.providers || []).reduce((m, p) => (m[p.id] = p.capabilities || {}, m), {});
   grid.innerHTML = est.contas.map(c =>
     '<div class="o-card o-acct">' +
       '<div class="o-acct-top">' +
         '<span class="o-avatar">' + esc((c.displayName || c.username).slice(0, 2).toUpperCase()) + '</span>' +
         '<span class="o-acct-id"><b>' + esc(c.displayName) + '</b><span>@' + esc(c.username) + '</span></span>' +
       '</div>' +
-      '<div style="display:flex;gap:8px;align-items:center">' + marca(c.status, c.status) +
-        '<span class="o-dim" style="font-size:11.5px">' + esc(c.provider) + '</span></div>' +
-      '<div class="o-caps">' + IG.CAPABILITIES.map(k =>
-        '<span class="o-cap' + (caps[k] ? ' yes' : '') + '">' + (caps[k] ? '✓ ' : '') + esc(rotulos[k] || k) + '</span>').join('') + '</div>' +
-      '<div><button class="btn btn-sm o-conta-remover" type="button" data-aid="' + esc(c.id) + '">Remover</button></div>' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        marca(rotuloEstadoConta(c.status, c.provider), c.status) +
+        '<span class="o-acct-prov">' + esc(nomeProvider(c.provider)) + '</span>' +
+        (c.provider === 'meta' && MC.metaEstado
+          ? '<span class="o-dim" style="font-size:11.5px">' + esc(rotuloEstadoMeta(MC.metaEstado.estado)) + '</span>'
+          : '') + '</div>' +
+      '<div class="o-dim" style="font-size:11.5px">' + esc(descricaoEnvio(c.provider)) + '</div>' +
+      '<div class="o-caps">' + IG.CAPABILITIES.map(k => {
+          const cap = (capsPorProvider[c.provider] || {})[k] === true;
+          return '<span class="o-cap' + (cap ? ' yes' : '') + '">' + (cap ? '✓ ' : '✕ ') + esc(rotulos[k] || k) + '</span>';
+        }).join('') + '</div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn btn-sm o-conta-editar" type="button" data-aid="' + esc(c.id) + '">Editar</button>' +
+        '<button class="btn btn-sm o-conta-remover" type="button" data-aid="' + esc(c.id) + '">Remover</button>' +
+      '</div>' +
     '</div>').join('');
+}
+
+/**
+ * §38: o cartão não pode dizer «ligada» enquanto nada estiver ligado.
+ *
+ * O estado guardado (`CONNECTED`) não é uma afirmação sobre o Instagram:
+ * é o que faz a conta contar para o teto de cinco, no repositório e no
+ * trigger SQL. Trocá-lo por `DISCONNECTED` para o cartão ficar bonito
+ * desligava o limite — foi o que um teste apanhou. O que se ajusta é a
+ * frase, e o que a determina é haver ou não fornecedor aprovado.
+ */
+/** Rótulo do estado de ligação da Meta, sem jargão. */
+function rotuloEstadoMeta(e) {
+  return ({
+    NOT_CONFIGURED: 'sem token', CONFIGURED: 'por validar',
+    CONNECTION_VALIDATED: 'ligação validada',
+    READY_FOR_CONTROLLED_TEST: 'pronta para teste controlado', ERROR: 'erro'
+  })[e] || e || '';
+}
+
+/**
+ * O que este canal consegue fazer, em português simples.
+ *
+ * Nenhum destes fornecedores permite mensagem a frio. Escrever só
+ * «envio disponível» levaria alguém a montar uma campanha para mil
+ * perfis e a descobrir tarde de mais que nenhum era contactável.
+ */
+function descricaoEnvio(provider) {
+  return ({
+    meta: 'Envio apenas para quem já escreveu para esta conta, dentro de 24 horas.',
+    manychat: 'Envio apenas para contactos que já existem na ManyChat.',
+    external: 'Envio conforme as regras do fornecedor configurado.'
+  })[provider] || 'Envio indisponível: provider não definido.';
+}
+
+function rotuloEstadoConta(status, provider) {
+  if (!provider || provider === 'mock') return 'Registada · sem envio';
+  /* `status` na base de dados é o que faz a conta contar para o teto de
+     cinco — não é uma afirmação sobre o fornecedor. Só se diz «ligada»
+     quando a ligação foi mesmo validada contra a API. */
+  if (provider === 'meta') {
+    const e = MC.metaEstado && MC.metaEstado.estado;
+    if (e === 'CONNECTION_VALIDATED' || e === 'READY_FOR_CONTROLLED_TEST') return 'Ligação validada';
+    return 'Registada · ligação por validar';
+  }
+  if (provider === 'manychat') {
+    return (MC.estado && MC.estado.status === 'CONNECTED') ? 'Ligação validada' : 'Registada · ligação por validar';
+  }
+  if (provider === 'external') return 'Registada · ligação por validar';
+  return ({
+    CONNECTED: 'Ligada',
+    DISCONNECTED: 'Desligada',
+    TOKEN_EXPIRED: 'Token expirado',
+    RESTRICTED: 'Restringida',
+    RATE_LIMITED: 'Limitada',
+    ERROR: 'Erro'
+  })[status] || status || 'Registada';
 }
 
 /* ---------- Fila ---------- */
@@ -4741,11 +5718,47 @@ function renderFila() {
 
 /* ---------- adicionar leads ao Outreach ---------- */
 
-function adicionarSelecionadosAoOutreach() {
+async function adicionarSelecionadosAoOutreach() {
   if (!O) { toast('Outreach indisponível neste modo.', 'warn'); return; }
   const escolhidos = state.leads.filter(l => state.selected.has(l.id));
   const leads = escolhidos.length ? escolhidos : state.filtered;
   if (!leads.length) { toast('Não há leads para adicionar.', 'info'); return; }
+
+  /* Com sessão aberta, os contactos vão para a base de dados. Gravar no
+     browser enquanto o utilizador acredita estar a trabalhar no servidor
+     seria criar duas verdades (§17). */
+  if (MODO === 'remoto') {
+    const btn = $('#btnAddOutreach');
+    if (btn) btn.disabled = true;
+    try {
+      const payload = leads.map(l => ({
+        leadId: l.id,
+        normalizedInstagram: (l.instagram || '').replace(/^@/, '').toLowerCase() || null,
+        name: l.nome || l.name || 'Sem nome',
+        company: l.nome || null,
+        city: l.cidade || l.localidade || null,
+        district: l.distrito || null,
+        activity: l.categoria || l.atividade || null,
+        source: state.searchQuery || 'pesquisa',
+        /* sem estes, o emparelhamento com a ManyChat não tem por onde
+           começar: a API não procura por Instagram */
+        email: (l.email || '').trim().toLowerCase() || null,
+        phone: (l.telefone || l.telemovel || '').replace(/[\s()./-]/g, '') || null
+      }));
+      const r = await remoto.importarContactos(payload);
+      const s = (r && r.resumo) || {};
+      await carregarRemoto();
+      toast((s.criados || 0) + ' contactos guardados no servidor' +
+            (s.atualizados ? ' · ' + s.atualizados + ' atualizados' : '') +
+            (s.ignorados ? ' · ' + s.ignorados + ' ignorados' : ''), 'success', 6000);
+    } catch (err) {
+      toast('Não foi possível guardar no servidor: ' + (err.message || 'erro'), 'error', 8000);
+    } finally {
+      const btn2 = $('#btnAddOutreach');
+      if (btn2) btn2.disabled = false;
+    }
+    return;
+  }
 
   const r = O.adicionarContactos(est, leads, { origem: state.searchQuery || 'pesquisa' });
   guardar();
@@ -4804,11 +5817,17 @@ function ligarEventosOutreach() {
     const t = est.templates.find(x => x.id === b.dataset.tid);
     if (!t) return;
     if (b.dataset.acao === 'editar') abrirTemplate(t);
-    else if (b.dataset.acao === 'duplicar') { O.duplicarTemplate(est, t.id); guardar(); renderOutreach(); toast('Template duplicado.', 'success'); }
+    else if (b.dataset.acao === 'duplicar') {
+      if (MODO === 'remoto') {
+        escreverRemoto(() => remoto.criarTemplate({ name: t.nome + ' (cópia)', body: t.mensagem }), 'Template duplicado.');
+      } else { O.duplicarTemplate(est, t.id); guardar(); renderOutreach(); toast('Template duplicado.', 'success'); }
+    }
     else if (b.dataset.acao === 'eliminar') {
       confirmDialog({ title: 'Eliminar template', msg: 'Eliminar "' + t.nome + '"? As campanhas já criadas mantêm a mensagem.', okLabel: 'Eliminar' }).then(ok => {
         if (!ok) return;
-        O.eliminarTemplate(est, t.id); guardar(); renderOutreach(); toast('Template eliminado.', 'success');
+        if (MODO === 'remoto') {
+          escreverRemoto(() => remoto.apagarTemplate(t.id), 'Template eliminado.');
+        } else { O.eliminarTemplate(est, t.id); guardar(); renderOutreach(); toast('Template eliminado.', 'success'); }
       });
     }
   });
@@ -4824,15 +5843,31 @@ function ligarEventosOutreach() {
 
   /* contas */
   $('#oBtnNovaConta').addEventListener('click', () => {
-    if (est.contas.length >= O.MAX_CONTAS) { toast('Limite máximo de ' + O.MAX_CONTAS + ' contas conectadas.', 'warn', 6000); return; }
+    if (est.contas.length >= O.MAX_CONTAS) { toast('Limite máximo de ' + O.MAX_CONTAS + ' contas registadas.', 'warn', 6000); return; }
+    OUT.contaEdicao = null;                    /* conta nova: nada a comparar */
     $('#oContaNome').value = ''; $('#oContaUser').value = '';
+    $('#oContaProvider').value = 'meta';
+    sincronizarDescricaoProvider();
     setFieldState($('#oContaUser'), '', { neutral: true });
+    openModal($('#oModalConta'));
+  });
+  $('#oContaProvider').addEventListener('change', sincronizarDescricaoProvider);
+  $('#oContasGrid').addEventListener('click', e => {
+    const b = e.target.closest('.o-conta-editar'); if (!b) return;
+    const c = est.contas.find(x => x.id === b.dataset.aid);
+    if (!c) return;
+    OUT.contaEdicao = c;
+    $('#oContaNome').value = c.nome || c.displayName || '';
+    $('#oContaUser').value = c.username || '';
+    $('#oContaProvider').value = c.provider || 'meta';
+    sincronizarDescricaoProvider();
     openModal($('#oModalConta'));
   });
   $('#oFormConta').addEventListener('submit', submeterConta);
   $('#oContasGrid').addEventListener('click', e => {
     const b = e.target.closest('.o-conta-remover'); if (!b) return;
     const c = est.contas.find(x => x.id === b.dataset.aid);
+    if (MODO === 'remoto') { escritaPorLigar('Remover contas'); return; }
     confirmDialog({ title: 'Remover conta', msg: 'Remover ' + (c ? '@' + c.username : 'esta conta') + ' do Outreach?', okLabel: 'Remover' }).then(ok => {
       if (!ok) return;
       O.removerConta(est, b.dataset.aid); guardar(); renderOutreach(); toast('Conta removida.', 'success');
@@ -4844,6 +5879,13 @@ function ligarEventosOutreach() {
     const det = e.target.closest('.o-det-campanha');
     if (det) { abrirDetalheCampanha(det.dataset.kid); return; }
     const b = e.target.closest('.o-camp-acao'); if (!b) return;
+    if (MODO === 'remoto') {
+      /* Gerar fila prepara envios. Sem fornecedor aprovado, as campanhas
+         ficam em rascunho — não se enche uma fila que ninguém pode
+         processar honestamente. */
+      escritaPorLigar(b.dataset.acao === 'fila' ? 'Gerar fila' : 'Mudar o estado de campanhas');
+      return;
+    }
     if (b.dataset.acao === 'fila') {
       const r = O.gerarFila(est, b.dataset.kid);
       guardar(); renderOutreach();
@@ -4867,7 +5909,7 @@ function ligarEventosOutreach() {
   $('#oCampSeguinte').addEventListener('click', () => passoWizard(1));
 
   /* fecho dos modais do Outreach */
-  ['#oModalConta', '#oModalTemplate', '#oModalCampanha', '#oModalDetalhe'].forEach(sel => {
+  ['#oModalConta', '#oModalTemplate', '#oModalCampanha', '#oModalDetalhe', '#oModalMigrar', '#oModalEnvioTeste'].forEach(sel => {
     const m = $(sel);
     $$(sel + ' [data-close]').forEach(b => b.addEventListener('click', () => closeModal(m)));
     m.addEventListener('mousedown', e => { if (e.target === e.currentTarget) closeModal(m); });
@@ -4923,6 +5965,15 @@ function submeterTemplate(e) {
   setFieldState($('#oTplNome'), nome ? '' : 'Indique um nome para o template.');
   setFieldState($('#oTplMsg'), msg.trim() ? '' : 'A mensagem não pode estar vazia.');
   if (!nome || !msg.trim()) return;
+  if (MODO === 'remoto') {
+    const id = OUT.templateEdicao && OUT.templateEdicao.id;
+    escreverRemoto(
+      () => (id ? remoto.atualizarTemplate(id, { name: nome, body: msg })
+                : remoto.criarTemplate({ name: nome, body: msg })),
+      'Template guardado.'
+    ).then(ok => { if (ok) closeModal($('#oModalTemplate')); });
+    return;
+  }
   try {
     if (OUT.templateEdicao) O.editarTemplate(est, OUT.templateEdicao.id, { nome, mensagem: msg });
     else O.criarTemplate(est, { nome, mensagem: msg });
@@ -4933,15 +5984,63 @@ function submeterTemplate(e) {
 
 /* ---------- conta ---------- */
 
+/* §16: descrições factuais. Nada de «ilimitado» nem «sem bloqueios» —
+   nenhum destes canais permite mensagem a frio, e o ecrã não vai
+   sugerir que permite. */
+const PROVIDER_DESC = {
+  meta: 'Ligação direta à API oficial da Meta. Requer conta profissional e respeita as regras de mensagens do Instagram.',
+  manychat: 'Ligação através da API da ManyChat. A disponibilidade depende do plano e da configuração da conta.',
+  external: 'Ligação através de um fornecedor externo configurado no LeadMap.'
+};
+const PROVIDER_NOME = { meta: 'Meta Oficial', manychat: 'ManyChat', external: 'API Externa', mock: 'Simulação' };
+
+/** §28: um provider desconhecido não rebenta o ecrã nem ganha nome inventado. */
+function nomeProvider(id) {
+  return PROVIDER_NOME[id] || (id ? String(id) : 'Não definido');
+}
+
+function sincronizarDescricaoProvider() {
+  const sel = $('#oContaProvider');
+  if (!sel) return;
+  const d = $('#oContaProviderDesc');
+  if (d) d.textContent = PROVIDER_DESC[sel.value] || '';
+  /* §17: trocar o provider de uma conta existente não reencaminha o que
+     já está em fila. Dizê-lo aqui é mais barato do que deixar alguém
+     descobrir com uma campanha a meio. */
+  const aviso = $('#oContaProviderAviso');
+  if (!aviso) return;
+  const anterior = OUT.contaEdicao && OUT.contaEdicao.provider;
+  const mudou = Boolean(anterior) && sel.value !== anterior;
+  aviso.hidden = !mudou;
+  aviso.textContent = mudou
+    ? 'Alterar o provider afeta apenas novos itens colocados na fila. Itens já enfileirados mantêm o provider original.'
+    : '';
+}
+
 function submeterConta(e) {
   e.preventDefault();
   const user = $('#oContaUser').value.trim();
   setFieldState($('#oContaUser'), user ? '' : 'Indique o nome de utilizador.');
   if (!user) return;
+  if (MODO === 'remoto') {
+    /* O teto de 5 é imposto pela base de dados, não por este ecrã: se
+       alguém contornar a UI, a sexta conta continua a ser recusada. */
+    escreverRemoto(
+      /* sem `provider`: o backend aplica o valor por omissão validado.
+         Nada aqui liga a conta a coisa nenhuma — é um registo. */
+      () => remoto.criarConta({
+        username: user,
+        displayName: $('#oContaNome').value.trim() || user,
+        provider: ($('#oContaProvider') && $('#oContaProvider').value) || undefined
+      }),
+      'Conta registada.'
+    ).then(ok => { if (ok) closeModal($('#oModalConta')); });
+    return;
+  }
   try {
     O.adicionarConta(est, { username: user, displayName: $('#oContaNome').value.trim() });
     guardar(); closeModal($('#oModalConta')); renderOutreach();
-    toast('Conta ligada.', 'success');
+    toast('Conta registada.', 'success');
   } catch (err) { setFieldState($('#oContaUser'), err.message); }
 }
 
@@ -4950,12 +6049,45 @@ function submeterConta(e) {
 function abrirWizard() {
   if (!est.contas.length) { toast('Ligue primeiro uma conta Instagram.', 'warn', 6000); mostrarAba('contas'); return; }
   const pre = OUT.selecao.size ? [...OUT.selecao] : est.contactos.filter(c => c.temInstagram).map(c => c.id);
-  OUT.wizard = { passo: 1, nome: '', contactoIds: pre, contaId: est.contas[0].id, templateId: null, mensagem: '' };
+  OUT.wizard = { passo: 1, nome: '', contactoIds: pre, contaId: est.contas[0].id, templateId: null, mensagem: '',
+                 /* Fase E: emparelhamento com a ManyChat e automação escolhida */
+                 match: null, aEmparelhar: false, flowNs: null };
   renderWizard();
   openModal($('#oModalCampanha'));
 }
 
 const PASSOS = ['Nome', 'Contactos', 'Conta', 'Mensagem', 'Preview', 'Criar'];
+
+const MC_MATCH_ROTULO = {
+  MATCH_CONFIRMED: 'Elegíveis ManyChat', NOT_IN_MANYCHAT: 'Não encontrados',
+  NO_LOOKUP_DATA: 'Sem dados para procura', INSTAGRAM_MISMATCH: 'Instagram incompatível',
+  AMBIGUOUS_MATCH: 'Correspondência ambígua', OPTED_OUT: 'Opt-out', PROVIDER_ERROR: 'Erro do fornecedor'
+};
+
+/**
+ * Emparelha os contactos selecionados com subscribers da ManyChat.
+ *
+ * O trabalho é todo do backend: é lá que vive o token e é lá que se
+ * decide o que conta como correspondência. Aqui só se mostra o
+ * resultado — incluindo, e sobretudo, quem NÃO é contactável.
+ */
+async function wizEmparelhar() {
+  const w = OUT.wizard;
+  const leads = est.contactos
+    .filter(c => w.contactoIds.includes(c.id))
+    .map(c => ({ id: c.id, nome: c.nome, email: c.email || null,
+                 telefone: c.telemovel || c.telefone || null,
+                 instagram: c.instagram || null, optOut: c.status === 'OPTED_OUT' }));
+  if (!leads.length) { w.match = null; return; }
+  w.aEmparelhar = true; renderWizard();
+  try {
+    w.match = await mcPedir('?action=match', { metodo: 'POST', corpo: { leads } });
+  } catch (err) {
+    w.match = { erro: err.message };
+  } finally {
+    w.aEmparelhar = false; renderWizard();
+  }
+}
 
 function renderWizard() {
   const w = OUT.wizard;
@@ -4984,13 +6116,56 @@ function renderWizard() {
       const v = e.target.value;
       if (e.target.checked) { if (!w.contactoIds.includes(v)) w.contactoIds.push(v); }
       else w.contactoIds = w.contactoIds.filter(x => x !== v);
+      w.match = null;                      /* a seleção mudou: o resultado anterior deixa de valer */
+      renderWizard();
     });
+
+    /* --- §7: repartição ManyChat --- */
+    const cx = document.createElement('div');
+    cx.style.marginTop = '14px';
+    if (w.aEmparelhar) {
+      cx.innerHTML = '<p class="o-dim" style="font-size:12.5px">A consultar a ManyChat, um contacto de cada vez…</p>';
+    } else if (w.match && w.match.erro) {
+      cx.innerHTML = '<div class="o-warn">' + esc(w.match.erro) + '</div>';
+    } else if (w.match) {
+      const r = w.match.resumo || {};
+      const linhas = Object.keys(MC_MATCH_ROTULO)
+        .filter(k => (r[k] || 0) > 0)
+        .map(k => '<div class="o-mc-linha"><span>' + esc(MC_MATCH_ROTULO[k]) + '</span><span><b>' + nf(r[k]) + '</b></span></div>')
+        .join('');
+      cx.innerHTML = '<p style="font-size:13px;font-weight:600;margin:0 0 4px">Situação na ManyChat</p>' + linhas +
+        (w.match.truncado ? '<div class="fhint">' + nf(w.match.truncado) + ' contactos não foram consultados neste lote.</div>' : '') +
+        '<div class="fhint">Só os <b>elegíveis</b> podem receber. Quem não foi encontrado nunca falou consigo na ManyChat — ' +
+        'e a API não permite procurar por Instagram.</div>';
+    } else {
+      cx.innerHTML = '<button class="btn btn-sm" type="button" id="oCampMatch">Verificar na ManyChat</button>' +
+        '<div class="fhint">Procura por email e, se falhar, por telefone. Nunca por nome nem por Instagram.</div>';
+    }
+    box.appendChild(cx);
+    const bm = $('#oCampMatch');
+    if (bm) bm.addEventListener('click', wizEmparelhar);
   } else if (w.passo === 3) {
     box.innerHTML = '<div class="field"><label for="oCampConta">Conta Instagram</label>' +
       '<select class="tsel" id="oCampConta" style="width:100%">' + est.contas.map(c =>
         '<option value="' + esc(c.id) + '"' + (c.id === w.contaId ? ' selected' : '') + '>@' + esc(c.username) + ' · ' + esc(c.provider) + '</option>').join('') +
       '</select></div>';
     $('#oCampConta').addEventListener('change', e => { w.contaId = e.target.value; });
+
+    /* --- §8: ligação real ao fornecedor, não uma promessa --- */
+    const e = MC.estado;
+    const cx3 = document.createElement('div');
+    cx3.style.marginTop = '12px';
+    cx3.innerHTML = e
+      ? '<div class="o-mc-linha"><span>ManyChat</span><span>' +
+        (e.status === 'CONNECTED'
+          ? '<b>Ligada</b>' + (e.page ? ' · ' + esc(e.page.name) : '')
+          : e.status === 'NOT_CONFIGURED'
+            ? '<b>Não configurado</b> — falta MANYCHAT_API_TOKEN no backend'
+            : '<b>' + esc(e.status) + '</b>' + (e.message ? ' · ' + esc(e.message) : '')) + '</span></div>'
+      : '<button class="btn btn-sm" type="button" id="oCampTestarMc">Testar conexão ManyChat</button>';
+    box.appendChild(cx3);
+    const bt = $('#oCampTestarMc');
+    if (bt) bt.addEventListener('click', async () => { await mcTestarLigacao(); renderWizard(); });
   } else if (w.passo === 4) {
     box.innerHTML = '<div class="field"><label for="oCampTpl">Template</label>' +
       '<select class="tsel" id="oCampTpl" style="width:100%"><option value="">Escrever mensagem própria</option>' +
@@ -5010,6 +6185,26 @@ function renderWizard() {
       const b = e.target.closest('button'); if (!b) return;
       const ta = $('#oCampMsg'); ta.value += b.dataset.v; w.mensagem = ta.value; ta.focus();
     });
+
+    /* --- §9: a automação é da ManyChat. O LeadMap dispara, não escreve.
+       Por isso a lista vem de getFlows e nunca é inventada aqui. --- */
+    const cx4 = document.createElement('div');
+    cx4.style.marginTop = '14px';
+    if (MC.flows && MC.flows.length) {
+      cx4.innerHTML = '<div class="field"><label for="oCampFlow">Automação ManyChat (envio real)</label>' +
+        '<select class="tsel" id="oCampFlow" style="width:100%">' +
+        '<option value="">— nenhuma —</option>' +
+        MC.flows.map(f => '<option value="' + esc(f.ns) + '"' + (f.ns === w.flowNs ? ' selected' : '') + '>' +
+          esc(f.name) + '</option>').join('') + '</select>' +
+        '<div class="fhint">Com automação escolhida, é a ManyChat que envia o conteúdo — o texto acima ' +
+        'serve só para pré-visualizar quem entra na campanha.</div></div>';
+    } else {
+      cx4.innerHTML = '<div class="fhint">Sem automações carregadas da ManyChat. Vá a ' +
+        '<b>Contas Instagram</b> e use <b>Testar conexão</b> para as ir buscar.</div>';
+    }
+    box.appendChild(cx4);
+    const sf = $('#oCampFlow');
+    if (sf) sf.addEventListener('change', ev => { w.flowNs = ev.target.value || null; });
   } else if (w.passo === 5) {
     const v = O.validarCampanha(est, w);
     /* preview com contactos REAIS da seleção — nunca exemplos inventados */
@@ -5025,6 +6220,37 @@ function renderWizard() {
           (r.faltam.length ? '<div class="o-warn">Sem dados para: ' + esc(r.faltam.join(', ')) + '.</div>' : '') + '</div>';
       }).join('') : '<div class="o-dim">Nenhum contacto elegível.</div>') + '</div></div>' +
       (v.erros.length ? '<div class="o-warn" style="margin-top:12px">' + esc(v.erros.join(' ')) + '</div>' : '');
+
+    /* --- §10: o que vai acontecer, contacto a contacto, com a prova --- */
+    if (w.match && w.match.resultados) {
+      const confirmados = w.match.resultados.filter(x => x.status === 'MATCH_CONFIRMED');
+      const porId = new Map(est.contactos.map(c => [c.id, c]));
+      const flow = (MC.flows || []).find(f => f.ns === w.flowNs);
+      const cx5 = document.createElement('div');
+      cx5.style.marginTop = '14px';
+      const l = (k, val) => '<dt>' + esc(k) + '</dt><dd>' + esc(val || '—') + '</dd>';
+      cx5.innerHTML =
+        '<p style="font-size:13px;font-weight:600;margin:0 0 6px">Prontos para envio real (' + nf(confirmados.length) + ')</p>' +
+        (confirmados.length
+          ? '<div class="o-et">' + confirmados.slice(0, 5).map(x => {
+              const lead = porId.get(x.leadId) || {};
+              return '<dl>' +
+                l('Lead', lead.nome) +
+                l('Email', lead.email) +
+                l('Telefone', lead.telemovel || lead.telefone) +
+                l('Instagram (LeadMap)', lead.instagram ? '@' + lead.instagram : null) +
+                l('Instagram (ManyChat)', x.subscriber && x.subscriber.igUsername ? '@' + x.subscriber.igUsername : null) +
+                l('Subscriber ID', x.subscriber && x.subscriber.subscriberId) +
+                l('Última interação', x.subscriber && x.subscriber.lastInteraction) +
+                l('Automação', flow ? flow.name : (w.flowNs || 'por escolher')) +
+                l('Fornecedor', 'ManyChat') +
+                '<dt>Correspondência</dt><dd><b>MATCH CONFIRMADO</b> · ' + esc(x.motivo || '') + '</dd>' +
+              '</dl>'; }).join('<hr style="border:none;border-top:1px solid var(--border);margin:12px 0">') +
+            (confirmados.length > 5 ? '<div class="fhint">A mostrar 5 de ' + nf(confirmados.length) + '.</div>' : '') +
+            '</div>'
+          : '<div class="o-warn">Nenhum contacto confirmado na ManyChat. Nada seria enviado.</div>');
+      box.appendChild(cx5);
+    }
   } else {
     const v = O.validarCampanha(est, w);
     box.innerHTML = '<div class="o-empty"><h3>' + (v.valido ? 'Pronta a criar' : 'Faltam dados') + '</h3>' +

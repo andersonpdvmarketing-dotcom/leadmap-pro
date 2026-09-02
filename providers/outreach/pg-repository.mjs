@@ -62,7 +62,7 @@ export class PgOutreachRepository extends OutreachRepository {
     try { return await c.query(sql, params); }
     catch (err) {
       const m = String(err && err.message);
-      if (/MAX_ACCOUNTS/.test(m)) throw new RepositoryError('MAX_ACCOUNTS', 'Limite máximo de 5 contas conectadas.');
+      if (/MAX_ACCOUNTS/.test(m)) throw new RepositoryError('MAX_ACCOUNTS', 'Limite máximo de 5 contas registadas.');
       if (/CAMPAIGN_TERMINAL/.test(m)) throw new RepositoryError('CAMPAIGN_TERMINAL', m);
       if (err && err.code === '23505') throw new RepositoryError('DUPLICATE', m);
       if (err && err.code === '23503') throw new RepositoryError('NOT_FOUND', m);
@@ -101,17 +101,20 @@ export class PgOutreachRepository extends OutreachRepository {
   async upsertContacto(d) {
     const chave = d.normalizedInstagram ? 'ig:' + d.normalizedInstagram : 'lead:' + d.leadId;
     const r = await this.q(
-      `INSERT INTO outreach.contact (id,lead_id,normalized_instagram,name,company,city,district,activity,source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `INSERT INTO outreach.contact (id,lead_id,normalized_instagram,name,company,city,district,activity,source,email,phone)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        ON CONFLICT (normalized_instagram) WHERE normalized_instagram IS NOT NULL
        DO UPDATE SET
          company  = COALESCE(outreach.contact.company,  EXCLUDED.company),
          city     = COALESCE(outreach.contact.city,     EXCLUDED.city),
          district = COALESCE(outreach.contact.district, EXCLUDED.district),
-         activity = COALESCE(outreach.contact.activity, EXCLUDED.activity)
+         activity = COALESCE(outreach.contact.activity, EXCLUDED.activity),
+         email    = COALESCE(outreach.contact.email,    EXCLUDED.email),
+         phone    = COALESCE(outreach.contact.phone,    EXCLUDED.phone)
        RETURNING *, (xmax = 0) AS criado`,
       ['con:' + chave, d.leadId || null, d.normalizedInstagram || null, d.name || 'Sem nome',
-       d.company || null, d.city || null, d.district || null, d.activity || null, d.source || null]);
+       d.company || null, d.city || null, d.district || null, d.activity || null, d.source || null,
+       d.email || null, d.phone || null]);
     const linha = r.rows[0];
     return { contacto: camel(linha), criado: linha.criado === 't' || linha.criado === true };
   }
@@ -223,6 +226,58 @@ export class PgOutreachRepository extends OutreachRepository {
   async lerItem(id) {
     const r = await this.q(`SELECT * FROM outreach.queue_item WHERE id=$1`, [id]);
     return r.rows.length ? camel(r.rows[0]) : null;
+  }
+
+  async listarWebhooks({ provider = null, limit = 50 } = {}) {
+    const r = provider
+      ? await this.q(`SELECT * FROM outreach.webhook_event WHERE provider = $1
+                       ORDER BY received_at DESC LIMIT $2`, [provider, String(limit)])
+      : await this.q(`SELECT * FROM outreach.webhook_event ORDER BY received_at DESC LIMIT $1`, [String(limit)]);
+    return { total: r.rows.length, items: r.rows.map(l => {
+      const c = camel(l);
+      if (typeof c.payloadRedacted === 'string') {
+        try { c.payloadRedacted = JSON.parse(c.payloadRedacted); } catch (e) { c.payloadRedacted = {}; }
+      }
+      return c;
+    }) };
+  }
+
+  async contactoPorRecipient(provider, recipientId) {
+    if (!provider || !recipientId) return null;
+    const r = await this.q(
+      `SELECT * FROM outreach.contact WHERE ig_user_id_provider = $1 AND ig_user_id = $2 LIMIT 1`,
+      [provider, String(recipientId)]);
+    return r.rows[0] ? camel(r.rows[0]) : null;
+  }
+
+  async associarRecipient({ contactId, provider, recipientId, verificado = false }) {
+    const dono = await this.contactoPorRecipient(provider, recipientId);
+    if (dono && dono.id !== contactId) {
+      throw new RepositoryError('RECIPIENT_ALREADY_LINKED', 'Este destinatário já está associado a outro contacto.');
+    }
+    const r = await this.q(
+      `UPDATE outreach.contact
+          SET ig_user_id = $2, ig_user_id_provider = $3,
+              ig_user_id_verified_at = CASE WHEN $4 = 'sim' AND ig_user_id_verified_at IS NULL
+                                            THEN now() ELSE ig_user_id_verified_at END
+        WHERE id = $1
+          AND (ig_user_id IS NULL OR (ig_user_id = $2 AND ig_user_id_provider = $3))
+        RETURNING *`,
+      [contactId, String(recipientId), provider, verificado ? 'sim' : 'nao']);
+    if (!r.rows[0]) throw new RepositoryError('RECIPIENT_ALREADY_LINKED', 'O contacto já tem outro destinatário associado.');
+    return { contacto: camel(r.rows[0]), jaExistia: Boolean(dono) };
+  }
+
+  async ultimoInboundDe(provider, recipientId) {
+    const r = await this.q(
+      `SELECT received_at, payload_redacted FROM outreach.webhook_event
+        WHERE provider = $1 AND payload_redacted->>'senderIgsid' = $2
+        ORDER BY received_at DESC LIMIT 1`, [provider, String(recipientId)]);
+    const l = r.rows[0];
+    if (!l) return null;
+    let p = l.payload_redacted;
+    if (typeof p === 'string') { try { p = JSON.parse(p); } catch (e) { p = {}; } }
+    return (p && p.at) || l.received_at || null;
   }
   async lerContacto(id) {
     const r = await this.q(`SELECT * FROM outreach.contact WHERE id=$1`, [id]);

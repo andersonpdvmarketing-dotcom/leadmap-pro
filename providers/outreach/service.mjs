@@ -32,14 +32,17 @@ export class OutreachService {
     const dados = extrair(corpo, {
       username: { tipo: 'texto', obrigatorio: true, min: 1, max: 30, padrao: /^@?[a-zA-Z0-9._]{1,30}$/ },
       displayName: { tipo: 'texto', max: MAX_NOME },
-      provider: { tipo: 'enum', valores: ['mock', 'meta', 'external'], omissao: 'mock' }
+      /* A lista tem de acompanhar os fornecedores que existem mesmo:
+         o `manychat` faltava aqui e o ecrã deixava escolhê-lo, para
+         depois o backend recusar — o pior sítio para descobrir. */
+      provider: { tipo: 'enum', valores: ['meta', 'manychat', 'external', 'mock'], omissao: 'mock' }
     });
     const username = dados.username.replace(/^@/, '').toLowerCase();
 
     /* o teto é aplicado aqui E no banco — a UI é a terceira barreira */
     const contas = await this.repo.listarContas();
     if (contas.length >= MAX_ACCOUNTS) {
-      throw new RepositoryError('MAX_ACCOUNTS', 'Limite máximo de ' + MAX_ACCOUNTS + ' contas conectadas.');
+      throw new RepositoryError('MAX_ACCOUNTS', 'Limite máximo de ' + MAX_ACCOUNTS + ' contas registadas.');
     }
     const conta = await this.repo.criarConta({ ...dados, username });
     await this.auditar(AUDIT_ACTION.ACCOUNT_CREATED, 'instagram_account', conta.id, { username, provider: conta.provider });
@@ -72,7 +75,10 @@ export class OutreachService {
           city: { tipo: 'texto', max: MAX_NOME },
           district: { tipo: 'texto', max: MAX_NOME },
           activity: { tipo: 'texto', max: MAX_NOME },
-          source: { tipo: 'texto', max: MAX_NOME }
+          source: { tipo: 'texto', max: MAX_NOME },
+          /* os dois únicos campos por onde a ManyChat deixa procurar */
+          email: { tipo: 'texto', max: 254 },
+          phone: { tipo: 'texto', max: 32 }
         });
       } catch (e) { resumo.ignorados += 1; continue; }
       if (!c.normalizedInstagram && !c.leadId) { resumo.ignorados += 1; continue; }

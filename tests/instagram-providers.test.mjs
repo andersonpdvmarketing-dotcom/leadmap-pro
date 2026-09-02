@@ -978,8 +978,12 @@ test('META BLOQUEADO: connect, perfil e conversas também não tocam na rede', a
   const conta = { providerAccountId: '1784' };
 
   await assert.rejects(() => p.connect({ providerAccountId: '1784' }), /META_PROVIDER_NOT_VALIDATED|bloqueado/);
-  await assert.rejects(() => p.fetchProfile(conta, 'alguem'), /bloqueado/);
   await assert.rejects(() => p.listConversations(conta), /bloqueado/);
+  /* `fetchProfile` deixou de ser recusado por bloqueio e passou a
+     sê-lo por não existir: `business_discovery` é do caminho Facebook
+     Login e não está documentado em graph.instagram.com. A garantia que
+     interessa — não tocar na rede — continua a valer. */
+  await assert.rejects(() => p.fetchProfile(conta, 'alguem'), /não suporta/i);
   assert.equal(chamadas, 0, 'alguma via chegou a fazer fetch com o adapter bloqueado');
 });
 
