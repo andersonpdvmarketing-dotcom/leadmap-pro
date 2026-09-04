@@ -3693,38 +3693,126 @@ function renderAll(opts) {
 }
 
 /* ---------- 11. Exportação (XLSX com fallback CSV) ---------- */
-function leadsToRows(list) {
-  return list.map(l => ({
-    'Empresa / Profissional': l.nome,
-    'Atividade': nichoLabel(l),
-    'Segmento': l.segmento,
-    'Morada': l.morada,
-    'Código Postal': l.codigoPostal,
-    'Localidade': l.localidade,
-    'Distrito': l.distrito || ND,
-    'Concelho': l.concelho || ND,
-    'Telefone': l.telefone,
-    'Telemóvel': l.telemovel,
-    'Email': (l.emails && l.emails.length) ? l.emails.map(e => e.email).join('; ') : ND,
-    'Website': l.website,
-    'Instagram': l.instagram,
-    'Facebook': l.facebook,
-    'LinkedIn': l.linkedin,
-    'Latitude': l.lat,
-    'Longitude': l.lon,
-    'Distância (km)': l.distanciaKm,
-    'Fonte': fonteLabel(l),
-    'Pesquisa': (l.searchQueries && l.searchQueries.length) ? l.searchQueries.join('; ') : ND,
-    'Lead já capturada': l.historico ? (l.historico.estado === 'JA_CAPTURADA' ? 'SIM' : 'NÃO') : ND,
-    'Número de capturas': l.historico ? (Number(l.historico.captureCount) || 1) : ND,
-    'Primeira captura': (l.historico && l.historico.firstCapturedAt) ? fmtDataHora(l.historico.firstCapturedAt) : ND,
-    'ID da pesquisa': (l.historico && l.historico.firstSearchId) ? l.historico.firstSearchId : (state.searchId || ND),
-    'Data da Pesquisa': l.dataPesquisa
-  }));
+/* Numa folha de cálculo uma célula vazia filtra, ordena e soma bem;
+   "N/D" é texto que suja tudo isso. O ND continua a ser a convenção do
+   ecrã — muda só o que sai no ficheiro. */
+const celula = v => (v == null || v === ND || v === '') ? '' : v;
+
+/* O @ do Instagram, extraído do URL e só quando o URL é mesmo de um
+   perfil. Um link para /p/, /reel/ ou /explore/ aponta para uma
+   publicação, não para uma conta: nesses casos fica vazio, porque
+   adivinhar o nome da conta seria inventar. */
+function instagramUsername(url) {
+  if (!url || url === ND) return '';
+  let u;
+  try { u = new URL(/^https?:\/\//i.test(url) ? url : 'https://' + url); }
+  catch (e) { return ''; }
+  if (!/(^|\.)instagram\.com$/i.test(u.hostname)) return '';
+  const seg = u.pathname.split('/').filter(Boolean);
+  if (!seg.length) return '';
+  const nome = seg[0].toLowerCase();
+  if (['p', 'reel', 'reels', 'explore', 'stories', 'tv', 'accounts'].includes(nome)) return '';
+  if (!/^[a-z0-9._]{1,30}$/i.test(seg[0])) return '';
+  return '@' + seg[0];
 }
-function buildWorkbook(list) {
-  const ws = XLSX.utils.json_to_sheet(leadsToRows(list));
-  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 17 }, { wch: 16 }, { wch: 18 }, { wch: 17 }, { wch: 17 }, { wch: 34 }, { wch: 32 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 26 }, { wch: 24 }, { wch: 16 }, { wch: 17 }, { wch: 18 }, { wch: 20 }, { wch: 17 }];
+
+/* Place ID e OSM ID não são campos do modelo: vêm do próprio id do lead,
+   que os codifica desde a origem — 'google-<placeId>' e
+   'osm-<tipo>-<id>'. É leitura determinística do que já está guardado,
+   e um id de outra forma (demo, por exemplo) não devolve nada. */
+function idsDaFonte(l) {
+  const id = (l && typeof l.id === 'string') ? l.id : '';
+  const g = id.match(/^google-(.+)$/);
+  if (g) {
+    return { placeId: g[1], osmId: '',
+      /* formato documentado pela Google para abrir um place id */
+      maps: 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(g[1]) };
+  }
+  const o = id.match(/^osm-(node|way|relation)-(\d+)$/);
+  if (o) {
+    return { placeId: '', osmId: o[1] + '/' + o[2],
+      maps: 'https://www.openstreetmap.org/' + o[1] + '/' + o[2] };
+  }
+  return { placeId: '', osmId: '', maps: '' };
+}
+
+/**
+ * Uma linha por lead, com tudo o que o lead guarda.
+ *
+ * Lê as redes por `getSocials()`, que junta o modelo normalizado
+ * (`l.socials`, onde vivem TikTok e YouTube — que não têm campo antigo e
+ * por isso escapavam à exportação) aos campos legados vindos da fonte.
+ *
+ * Não lê `state`: o ficheiro tem de representar a lista que lhe deram,
+ * não a pesquisa aberta no ecrã. O id da geração entra por `opts`.
+ */
+function leadsToRows(list, opts = {}) {
+  const idPesquisaFallback = opts.searchId || '';
+  return list.map(l => {
+    const s = getSocials(l);
+    const ig = s.instagram.found ? s.instagram.url : celula(l.instagram);
+    const fonteIds = idsDaFonte(l);
+    const emails = Array.isArray(l.emails) ? l.emails.map(e => e && e.email).filter(Boolean) : [];
+    /* País: só sai se vier explícito nos dados.
+       Ter concelho ou distrito NÃO é prova de país. O modo Portugal usa
+       uma bounding box, não a fronteira política, e o próprio código
+       reconhece que "as zonas de fronteira apanham empresas espanholas";
+       o filtro que as exclui é condicional, corre só no modo nacional e
+       não fica registado no lead. Inferir daí seria adivinhar.
+       Hoje nenhuma fonte preenche este campo, por isso a coluna sai
+       vazia — e passa a preencher-se sozinha no dia em que o modelo
+       ganhar um país a sério. */
+    const pais = [l.pais, l.country].find(v => typeof v === 'string' && v.trim() && v !== ND);
+    return {
+      'Empresa / Profissional': celula(l.nome),
+      'Atividade': celula(nichoLabel(l)),
+      'Segmento': celula(l.segmento),
+      'Tipo de lead': l.leadType === 'BUSINESS' ? 'Empresa' : '',
+      'Morada': celula(l.morada),
+      'Código Postal': celula(l.codigoPostal),
+      'Localidade': celula(l.localidade),
+      'Concelho': celula(l.concelho),
+      'Distrito': celula(l.distrito),
+      'País': pais ? pais.trim() : '',
+      'Telefone': celula(l.telefone),
+      'Telemóvel': celula(l.telemovel),
+      'Email': emails.join('; '),
+      'Website': celula(l.website),
+      'Instagram': ig,
+      'Instagram @': instagramUsername(ig),
+      'Facebook': s.facebook.found ? s.facebook.url : celula(l.facebook),
+      'LinkedIn': s.linkedin.found ? s.linkedin.url : celula(l.linkedin),
+      'TikTok': s.tiktok.found ? s.tiktok.url : '',
+      'YouTube': s.youtube.found ? s.youtube.url : '',
+      'Latitude': l.lat,
+      'Longitude': l.lon,
+      'Distância (km)': l.distanciaKm,
+      'Fonte': celula(fonteLabel(l)),
+      'Place ID': fonteIds.placeId,
+      'OSM ID': fonteIds.osmId,
+      'Google Maps': fonteIds.maps,
+      'Pesquisa': (l.searchQueries && l.searchQueries.length) ? l.searchQueries.join('; ') : '',
+      'Lead já capturada': l.historico ? (l.historico.estado === 'JA_CAPTURADA' ? 'SIM' : 'NÃO') : '',
+      'Número de capturas': l.historico ? (Number(l.historico.captureCount) || 1) : '',
+      'Primeira captura': (l.historico && l.historico.firstCapturedAt) ? celula(fmtDataHora(l.historico.firstCapturedAt)) : '',
+      'ID da pesquisa': (l.historico && l.historico.firstSearchId) ? l.historico.firstSearchId : idPesquisaFallback,
+      'Data da Pesquisa': celula(l.dataPesquisa)
+    };
+  });
+}
+/* Larguras por coluna, na mesma ordem das chaves de leadsToRows. */
+const LARGURAS_XLSX = [
+  34, 18, 24, 13,           /* empresa · atividade · segmento · tipo */
+  32, 12, 17, 18, 16, 11,   /* morada · CP · localidade · concelho · distrito · país */
+  17, 17, 34, 32,           /* telefone · telemóvel · email · website */
+  30, 20, 30, 30, 30, 30,   /* instagram · @ · facebook · linkedin · tiktok · youtube */
+  11, 11, 13, 26,           /* lat · lon · distância · fonte */
+  30, 18, 46,               /* place id · osm id · maps */
+  24, 16, 17, 18, 20, 17    /* pesquisa · capturada · nº · 1ª captura · id · data */
+];
+function buildWorkbook(list, opts = {}) {
+  const ws = XLSX.utils.json_to_sheet(leadsToRows(list, opts));
+  ws['!cols'] = LARGURAS_XLSX.map(wch => ({ wch }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leads');
   return wb;
@@ -3741,8 +3829,8 @@ function ensureXlsx() {
     setTimeout(() => resolve(!!window.XLSX), 12000);
   });
 }
-function exportCsv(list) {
-  const rows = leadsToRows(list);
+function exportCsv(list, opts = {}) {
+  const rows = leadsToRows(list, opts);
   const cols = Object.keys(rows[0]);
   const escCsv = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const body = [cols.map(escCsv).join(';')].concat(rows.map(r => cols.map(c => escCsv(r[c])).join(';'))).join('\r\n');
@@ -3756,11 +3844,12 @@ function exportCsv(list) {
 async function exportLeads(list, origem) {
   if (!list.length) { toast('Não há leads para exportar.', 'warn'); return; }
   const ok = await ensureXlsx();
+  const opts = { searchId: state.searchId || '' };
   if (ok) {
-    XLSX.writeFile(buildWorkbook(list), 'leadmap-pro_' + todayStamp() + '.xlsx');
+    XLSX.writeFile(buildWorkbook(list, opts), 'leadmap-pro_' + todayStamp() + '.xlsx');
     toast(list.length + ' leads exportados para Excel (' + origem + ').', 'success');
   } else {
-    exportCsv(list);
+    exportCsv(list, opts);
     toast('Biblioteca Excel indisponível — exportado CSV compatível (abre no Excel).', 'warn', 7000);
   }
 }
@@ -4567,6 +4656,26 @@ function updateLeadSocialUI(id) {
   else if (m && m.getPopup && m.getPopup()) m.setPopupContent(popupHtml(lead));
 }
 
+/* ---------- Persistência do enriquecimento no snapshot ----------
+   O snapshot é gravado quando a pesquisa termina, e o enriquecimento só
+   chega depois. Sem isto, o que ficava no IndexedDB — e portanto no XLSX
+   descarregado a partir de "Listas geradas" — nunca tinha email nem redes
+   sociais. Agrupado no tempo porque o enriquecimento aplica lead a lead e
+   uma gravação por lead seria dezenas de escritas seguidas.
+   A camada de histórico decide se aceita: só regrava a geração desta
+   sessão, e só se o conjunto de ids bater certo. */
+const SNAPSHOT_DEBOUNCE_MS = 1500;
+let snapshotSyncTimer = null;
+function agendarSincronizacaoSnapshot() {
+  const h = window.__historico;
+  if (!h || !h.disponivel || typeof h.sincronizarEnriquecimento !== 'function') return;
+  clearTimeout(snapshotSyncTimer);
+  snapshotSyncTimer = setTimeout(() => {
+    Promise.resolve(h.sincronizarEnriquecimento(state.leads))
+      .catch(e => console.warn('[Histórico] regravação do snapshot', e));
+  }, SNAPSHOT_DEBOUNCE_MS);
+}
+
 /* Aplica o resultado ao lead: preenche .socials e sincroniza os campos antigos */
 function applySocials(id, registo) {
   const lead = state.leads.find(l => l.id === id);
@@ -4578,6 +4687,7 @@ function applySocials(id, registo) {
   }
   updateLeadSocialUI(id);
   renderKPIs();
+  agendarSincronizacaoSnapshot();
 }
 
 /* Enriquecimento de um lead (Etapa 8) */
@@ -4731,6 +4841,7 @@ function applyEmails(id, registo) {
   lead.emails = registo.emails;
   updateLeadEmailUI(id);
   renderKPIs();   /* o KPI "Com email" acompanha o enriquecimento, como o social */
+  agendarSincronizacaoSnapshot();
 }
 
 /* Enriquecimento de email de um lead */
@@ -6467,6 +6578,9 @@ let H = null;              /* modelo do histórico */
 let histStore = null;
 let indice = null;         /* IndiceCapturas — lookup O(1) */
 let listas = [];
+/* Geração criada nesta sessão, a única cujo snapshot pode ser regravado
+   com o enriquecimento que chega depois: { historyId, ids:Set }. */
+let snapshotVivo = null;
 
 async function iniciarHistorico() {
   try {
@@ -6486,6 +6600,38 @@ async function iniciarHistorico() {
         const r = H.classificarLeads(leads, indice, { searchId });
         return { ...r, searchId, contexto };
       },
+      /**
+       * Regrava o snapshot da geração desta sessão com o enriquecimento
+       * que entretanto chegou.
+       *
+       * PORQUE É PRECISO
+       * ----------------
+       * `cleanLead()` cria cada lead com `socials` vazios e `emails: []`
+       * — o enriquecimento corre depois, em segundo plano. O snapshot era
+       * gravado antes disso, e o IndexedDB serializa no momento da
+       * escrita: as mutações posteriores nunca lá chegavam, e o ficheiro
+       * descarregado saía sem email e sem redes sociais.
+       *
+       * `snapshotVivo` cobre só a geração criada nesta sessão. Abrir uma
+       * lista antiga limpa-o de propósito — um snapshot histórico não
+       * deve ser reescrito por baixo de quem o está a consultar.
+       */
+      async sincronizarEnriquecimento(leads) {
+        if (!snapshotVivo || !histStore || !Array.isArray(leads)) return false;
+        /* guarda contra gravar na lista errada: o conjunto de ids tem de
+           ser exatamente o que foi snapshotado */
+        if (leads.length !== snapshotVivo.ids.size) return false;
+        for (const l of leads) if (!l || !snapshotVivo.ids.has(l.id)) return false;
+        try {
+          await histStore.guardarSnapshot(snapshotVivo.historyId, leads);
+          return true;
+        } catch (err) {
+          /* falhar aqui não pode partir o ecrã: o snapshot anterior
+             continua válido, apenas sem o enriquecimento */
+          console.warn('[Histórico] sincronização do enriquecimento', err);
+          return false;
+        }
+      },
       async registar(resultado, meta) {
         if (!histStore || !resultado) return null;
         indice.carregar(resultado.linhas);
@@ -6498,6 +6644,9 @@ async function iniciarHistorico() {
         try {
           await histStore.guardarPesquisa(registo);
           await histStore.guardarSnapshot(historyId, resultado.leads);
+          /* a partir daqui o enriquecimento desta geração pode ser
+             regravado por cima (ver sincronizarEnriquecimento) */
+          snapshotVivo = { historyId, ids: new Set(resultado.leads.map(l => l.id)) };
         } catch (err) {
           /* §33: nunca descartar uma geração em silêncio */
           toast('Não foi possível guardar esta lista no histórico: ' + (err.message || err) +
@@ -6518,7 +6667,8 @@ async function iniciarHistorico() {
     }
   } catch (err) {
     console.warn('[Histórico] indisponível', err);
-    window.__historico = { disponivel: false, classificar: () => null, registar: async () => null };
+    window.__historico = { disponivel: false, classificar: () => null, registar: async () => null,
+      sincronizarEnriquecimento: async () => false };
     const sec = $('#listasSection');
     if (sec) sec.hidden = true;
   }
@@ -6708,6 +6858,9 @@ function repetirGeracao(meta) {
 async function abrirLista(meta) {
   const leads = await histStore.lerSnapshot(meta.historyId || meta.id);
   if (!leads) { toast('Snapshot indisponível para esta lista.', 'error', 6000); return; }
+  /* §7: abrir uma lista histórica não a reescreve. O enriquecimento que
+     corra a partir daqui fica no ecrã, mas não toca no que está gravado. */
+  snapshotVivo = null;
   /* mostra exatamente o que foi obtido nessa execução — não repete a pesquisa */
   state.leads = leads;
   state.selected.clear();
@@ -6729,7 +6882,9 @@ async function baixarLista(meta) {
   if (!leads) { toast('Snapshot indisponível para esta lista.', 'error', 6000); return; }
   try {
     await ensureXlsx();
-    const wb = buildWorkbook(leads);
+    /* o id vem da própria geração, nunca de state: o ficheiro representa
+       a lista escolhida, não a pesquisa aberta no ecrã */
+    const wb = buildWorkbook(leads, { searchId: meta.searchId || meta.historyId || meta.id || '' });
     const nome = meta.nome.replace(/[\\/:*?"<>|]/g, '-').slice(0, 80);
     XLSX.writeFile(wb, nome + '.xlsx');
     toast(leads.length + ' leads exportadas de "' + meta.nome + '".', 'success');
