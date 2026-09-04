@@ -63,12 +63,19 @@ export class PostgresOutreachRepository extends OutreachRepository {
   }
 
   cabecalhos(extra = {}) {
-    return {
+    const headers = {
       apikey: this.serviceKey,
-      Authorization: 'Bearer ' + this.serviceKey,
       'Content-Type': 'application/json',
       'Accept-Profile': this.schema,
       'Content-Profile': this.schema,
+    };
+
+    if (!String(this.serviceKey).startsWith('sb_secret_')) {
+      headers.Authorization = 'Bearer ' + this.serviceKey;
+    }
+
+    return {
+      ...headers,
       ...extra
     };
   }
