@@ -508,3 +508,27 @@ test('evidenciasDoWebsite produz envelopes válidos', () => {
     assert.ok(ev.consultadoEm && ev.fonte);
   }
 });
+
+test('o espaço é separador de milhares em português', () => {
+  /* Encontrado num teste real: "Capital Social 1 000 000 €" era lido
+     como €1 e apresentado ao utilizador como CONFIRMADO. Um capital de
+     um euro é absurdo, e absurdo apresentado como facto é o erro que
+     este modelo existe para impedir. */
+  assert.equal(numeroPt('1 000 000'), 1000000);
+  assert.equal(extrairCapitalSocial('Capital Social 1 000 000 €')[0].valor, 1000000);
+  assert.equal(extrairFaturacao('Volume de negócios 2 400 000 €')[0].valor, 2400000);
+});
+
+test('um número com espaços sem moeda não é dinheiro', () => {
+  /* "Pessoa Coletiva n.º 514 998 270" é um NIPC. Sem um € a dizer que é
+     dinheiro, um número com espaços é ambíguo de mais para contar. */
+  assert.deepEqual(extrairCapitalSocial('Capital social NIPC 514 998 270'), []);
+  /* mas com moeda, e mesmo com um NIPC pelo meio, lê-se o valor certo */
+  const r = extrairCapitalSocial('Pessoa Coletiva n.º 514 998 270, CRC Lisboa. Capital Social 1 000 000 €');
+  assert.equal(r[0].valor, 1000000);
+});
+
+test('a moeda conta tanto antes como depois do número', () => {
+  assert.equal(extrairCapitalSocial('Capital Social: €100.000')[0].valor, 100000);
+  assert.equal(extrairCapitalSocial('Capital Social: 100.000 €')[0].valor, 100000);
+});

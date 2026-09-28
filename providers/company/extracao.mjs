@@ -44,6 +44,8 @@ function contexto(texto, indice, tamanho) {
  */
 export function numeroPt(bruto) {
   if (bruto == null) return null;
+  /* O espaço é separador de milhares em português: "1 000 000 €" é um
+     milhão, não um euro. Custou-me exatamente isso num teste real. */
   let s = String(bruto).trim().replace(/\s/g, '');
   if (!s) return null;
   const temPonto = s.includes('.'), temVirgula = s.includes(',');
@@ -103,15 +105,22 @@ function pareceAgregado(t, inicio, fim) {
  */
 function valorMonetarioApos(t, fim, janela = 70) {
   const trecho = t.slice(fim, fim + janela);
-  const re = /([\d][\d.,]{0,19})\s*(€|EUR|euros?|milh(?:õ|o)es?|mil|M\b|K\b)?/gi;
+  /* Grupos separados por espaço ou ponto — "1 000 000" e "1.000.000" —
+     antes do caso simples, para que a alternativa mais longa ganhe. A
+     moeda conta tanto à frente ("€100.000") como atrás ("100.000 €"). */
+  const re = /(€|EUR)?\s*(\d{1,3}(?:[ .]\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)\s*(€|EUR|euros?|milh(?:õ|o)es?|mil|M\b|K\b)?/gi;
   let m;
   while ((m = re.exec(trecho)) !== null) {
-    const base = numeroPt(m[1]);
+    const bruto = m[2];
+    const base = numeroPt(bruto);
     if (base == null) continue;
-    const sufixo = m[2] || '';
-    const temMoeda = Boolean(sufixo);
+    const sufixo = m[3] || '';
+    const temMoeda = Boolean(m[1]) || Boolean(sufixo);
     /* um ano solto sem moeda nem escala não é um valor */
     if (!temMoeda && base >= 1900 && base <= 2100) continue;
+    /* um número com espaços é ambíguo — "n.º 514 998 270" é um NIPC, não
+       um valor. Só conta se houver moeda a dizer que é dinheiro. */
+    if (!temMoeda && /\s/.test(bruto.trim())) continue;
     const valor = aplicarEscala(base, sufixo);
     if (valor == null) continue;
     return { valor, deslocamento: m.index, comprimento: m[0].length, temMoeda };
