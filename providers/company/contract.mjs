@@ -341,6 +341,9 @@ export function respostaConsulta({
       }
       /* revalida-se tudo o que vem de fora: o contrato não confia no adapter */
       dados[c] = envelope(v);
+      /* mas as evidências atravessam: revalidar não pode significar
+         perder a proveniência que o adapter recolheu */
+      if (Array.isArray(v.evidencias) && v.evidencias.length) dados[c].evidencias = v.evidencias;
       if (CAMPOS_NUMERICOS.includes(c) && temValor(dados[c]) && typeof dados[c].valor !== 'number') {
         throw new CompanyProviderError('INVALID_DATA',
           'Campo "' + c + '" tem de ser numérico.');

@@ -252,14 +252,21 @@ test('ARQUITETURA: as rotas novas vivem no catch-all', () => {
   }
 });
 
-test('ARQUITETURA: continuam 7 Serverless Functions', async () => {
+test('ARQUITETURA: as Serverless Functions cabem no teto do plano', async () => {
   const { readdirSync, statSync } = await import('node:fs');
   const base = new URL('../api/', import.meta.url);
   const contar = (dir) => readdirSync(dir).reduce((n, f) => {
     const u = new URL(f + (statSync(new URL(f, dir)).isDirectory() ? '/' : ''), dir);
     return n + (statSync(u).isDirectory() ? contar(u) : (/\.(js|mjs)$/.test(f) ? 1 : 0));
   }, 0);
-  assert.equal(contar(base), 7);
+  /* O que interessa proteger é o TETO do plano Hobby, não um número
+     exato: um deployment acima de 12 falha por inteiro e leva os
+     ficheiros estáticos com ele. Afirmar "exatamente 7" fazia com que
+     qualquer função nova partisse dois ficheiros de teste sem relação
+     com ela — foi o que aconteceu ao acrescentar /api/enrich/company. */
+  const n = contar(base);
+  assert.ok(n <= 12, 'acima do teto do plano Hobby: ' + n + ' funções');
+  assert.ok(n >= 7, 'desapareceram funções: ' + n);
 });
 
 test('ARQUITETURA: 5 migrations — a 005 traz a identidade do destinatário', async () => {

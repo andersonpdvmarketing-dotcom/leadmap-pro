@@ -838,6 +838,19 @@ td.td-porte { white-space: nowrap; }
 .porte-m.nao_cumpre { color: var(--danger); background: var(--warn-bg); }
 .porte-conf { font: 600 11px/1 var(--font); color: var(--danger); white-space: nowrap; cursor: help; }
 .porte-n { font-size: 11.5px; color: var(--muted); }
+/* Barra da investigação empresarial. Discreta de propósito: informa sem
+   interromper, e o utilizador continua a navegar por cima dela. */
+.emp-prog { display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+  border-top: 1px solid var(--border); background: var(--surface-2);
+  font-size: 12.5px; color: var(--text-2); }
+.emp-prog b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.emp-prog.feito { color: var(--ok); background: var(--ok-bg); }
+.emp-prog-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-prog-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none;
+  animation: empPulse 1.1s ease-in-out infinite; }
+@keyframes empPulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .emp-prog-dot { animation: none; opacity: .7; } }
+@media (max-width: 560px) { .emp-prog { padding: 7px 12px; font-size: 12px; } }
 /* Evidências, no popup. */
 .pop-evid { margin-top: 7px; }
 .evid-l { display: grid; grid-template-columns: auto 1fr; gap: 2px 7px; padding: 5px 0; border-top: 1px dashed var(--border); font-size: 11.5px; }
@@ -1092,6 +1105,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         </thead>
         <tbody id="leadsTbody"></tbody>
       </table>
+      <div class="emp-prog" id="empProgresso" role="status" aria-live="polite" hidden></div>
       <div class="empty" id="emptyState">
         <svg class="empty-art" viewBox="0 0 132 96" fill="none" aria-hidden="true">
           <g stroke="currentColor" stroke-width="1">
@@ -3364,6 +3378,9 @@ async function runSearch(p) {
       ...filtrosEmpresaVazios(), ...(p.empresa || {}) };
     state.excluidosPorte = 0;
     state.avaliacaoPorte = new Map();
+    /* §12: uma resposta da pesquisa anterior não pode colar-se a estes
+       leads. A geração muda e o que estava a viajar é descartado. */
+    try { cancelarEnriquecimentoEmpresa(); } catch (e) {}
     $('#tableFilter').value = '';
     $('#filtroTipo').value = '';
     $('#filtroHistorico').value = '';
@@ -3520,6 +3537,9 @@ async function runSearch(p) {
        já com loading a false. São idempotentes (cache + in-flight + fila),
        pelo que esta chamada não duplica pedidos. */
     try { startSocialEnrichment(); startEmailEnrichment(); } catch (e) { console.warn('[Enriquecimento]', e); }
+    /* Empresarial só com a caixa ligada, e sempre DEPOIS de os leads
+       estarem no ecrã: nunca faz a pesquisa esperar. */
+    try { startEmpresaEnrichment(); } catch (e) { console.warn('[Empresas]', e); }
   }
 }
 
@@ -5709,6 +5729,220 @@ function scorePorte(empresa) {
   return null;
 }
 
+/* =====================================================================
+   23. OPEN COMPANY INTELLIGENCE — ligação à interface (Fase 3.1)
+   ---------------------------------------------------------------------
+   O motor da Fase 3 já investigava empresas; faltava alguém carregar no
+   botão. Esta secção é esse alguém.
+
+   O QUE NUNCA PODE ACONTECER
+   --------------------------
+   A pesquisa não espera por isto. Os leads aparecem no ecrã e só depois
+   a investigação arranca, em segundo plano, com concorrência 2 e teto de
+   25 por lote. Uma pesquisa que demorasse trinta segundos porque o SICAE
+   está lento seria pior do que não ter esta funcionalidade.
+
+   E com a caixa desligada nada disto corre: nem uma chamada, nem uma
+   fila, nem um contador.
+
+   GERAÇÃO
+   -------
+   Cada pesquisa tem um número. Uma resposta que chegue depois de o
+   utilizador ter pesquisado outra coisa é descartada — sem isso, dados
+   da pesquisa anterior apareceriam colados a leads novos.
+   ===================================================================== */
+
+const EMPRESA_CONCURRENCY = 2;      /* fontes públicas: ir devagar é respeito */
+const EMPRESA_MAX_LOTE = 25;
+
+const empresaEstado = new Map();     /* leadId → POR_INVESTIGAR|INVESTIGANDO|ANALISADA|PARCIAL|ERRO */
+let empresaGeracao = 0;              /* invalida respostas de pesquisas anteriores */
+let empresaFila = [];
+let empresaActivos = 0;
+let empresaFeitos = 0;
+let empresaTotal = 0;
+
+function estadoEmpresaLead(id) { return empresaEstado.get(id) || 'POR_INVESTIGAR'; }
+
+/**
+ * Ordem de investigação.
+ *
+ * Com 25 lugares e centenas de leads, quem entra importa. Primeiro quem
+ * está à vista — é sobre esses que o utilizador está a decidir agora.
+ * Depois quem tem website, porque sem website não há por onde começar.
+ * E se houver critérios de porte ativos, quem está por decidir ganha
+ * prioridade sobre quem já se sabe que cumpre: investigar um match já
+ * confirmado não muda nada no ecrã.
+ */
+function ordenarParaInvestigar(leads) {
+  const f = state.filters;
+  const comCriterios = temCriterioEmpresa(f);
+  return leads
+    .map((l, i) => {
+      const e = getEmpresa(l);
+      let p = 0;
+      if (l.website && l.website !== ND) p += 100;
+      if (e.nif && e.nif.valor) p += 40;
+      if (comCriterios) {
+        const a = state.avaliacaoPorte.get(l.id);
+        /* quem está inconclusivo é quem a investigação pode desempatar */
+        if (a && a.desconhecidos > 0) p += 60;
+      }
+      if (l.telefone !== ND) p += 5;
+      return { l, i, p };
+    })
+    .sort((a, b) => (b.p - a.p) || (a.i - b.i))
+    .map(x => x.l);
+}
+
+/** Barra discreta por cima da tabela. Nunca bloqueia nada. */
+function renderProgressoEmpresa() {
+  const el = $('#empProgresso');
+  if (!el) return;
+  if (!empresaTotal) { el.hidden = true; return; }
+  el.hidden = false;
+  const fim = empresaFeitos >= empresaTotal;
+  el.classList.toggle('feito', fim);
+  el.innerHTML = (fim
+    ? '<span class="emp-prog-t">Dados empresariais analisados:</span> '
+    : '<span class="emp-prog-dot"></span><span class="emp-prog-t">A investigar dados empresariais…</span> ') +
+    '<b>' + empresaFeitos + ' / ' + empresaTotal + '</b>';
+}
+
+/**
+ * Aplica a resposta a um lead.
+ *
+ * Nunca apaga o que já lá estava por causa de um erro: um campo que
+ * volte vazio de uma fonte em baixo não pode levar consigo a evidência
+ * que outra fonte já tinha dado.
+ */
+function aplicarEmpresaInvestigada(lead, dados) {
+  if (!lead || !dados || typeof dados !== 'object') return false;
+  const antes = getEmpresa(lead);
+  const depois = getEmpresa({ empresa: dados });
+  const novo = {};
+  let mudou = false;
+  for (const c of CAMPOS_EMPRESA) {
+    const a = antes[c], b = depois[c];
+    /* o que chegou só substitui se trouxer mesmo alguma coisa */
+    const bTemValor = b && b.valor != null;
+    const aTemValor = a && a.valor != null;
+    if (bTemValor) { novo[c] = b; if (!aTemValor || a.valor !== b.valor || a.estado !== b.estado) mudou = true; }
+    else if (aTemValor) { novo[c] = a; }
+    else if (b && b.estado === 'NAO_ENCONTRADO' && a.estado === 'NAO_CONSULTADO') { novo[c] = b; mudou = true; }
+    else { novo[c] = a; }
+  }
+  lead.empresa = novo;
+  return mudou;
+}
+
+/** Investiga um lead. Nunca lança. */
+async function investigarLeadEmpresa(lead, geracao) {
+  if (geracao !== empresaGeracao) return;
+  empresaEstado.set(lead.id, 'INVESTIGANDO');
+  try {
+    const e = getEmpresa(lead);
+    const res = await fetchWithTimeout('/api/enrich/company', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead: {
+        id: lead.id,
+        website: lead.website && lead.website !== ND ? lead.website : null,
+        nif: e.nif && e.nif.valor ? String(e.nif.valor) : null
+      } })
+    }, 25000);
+    /* a pesquisa mudou enquanto isto viajava: a resposta já não é desta lista */
+    if (geracao !== empresaGeracao) return;
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (geracao !== empresaGeracao) return;
+    if (!json || json.success !== true) throw new Error('resposta inválida');
+
+    const mudou = json.empresa ? aplicarEmpresaInvestigada(lead, json.empresa) : false;
+    const depois = getEmpresa(lead);
+    const comAlgo = CAMPOS_EMPRESA.some(c => depois[c].valor != null);
+    empresaEstado.set(lead.id, comAlgo ? (CAMPOS_EMPRESA.every(c => depois[c].valor != null) ? 'ANALISADA' : 'PARCIAL') : 'ANALISADA');
+    if (mudou) agendarSincronizacaoSnapshot();
+    return mudou;
+  } catch (err) {
+    /* um erro numa empresa não apaga nada nem para a fila */
+    if (geracao === empresaGeracao) empresaEstado.set(lead.id, 'ERRO');
+    return false;
+  }
+}
+
+/* Refresca o conteúdo dos popups já abertos, sem tocar na posição do
+   mapa nem nos marcadores. */
+function atualizarPopupsEmpresa() {
+  try {
+    const P = MapProviders.osm;
+    if (!P || !P.markerById) return;
+    for (const l of state.filtered) {
+      const m = P.markerById.get(l.id);
+      if (m && m.getPopup && m.getPopup()) m.setPopupContent(popupHtml(l));
+    }
+  } catch (e) { /* o mapa pode nem estar montado */ }
+}
+
+function pumpFilaEmpresa(geracao) {
+  while (empresaActivos < EMPRESA_CONCURRENCY && empresaFila.length) {
+    if (geracao !== empresaGeracao) { empresaFila = []; return; }
+    const lead = empresaFila.shift();
+    empresaActivos++;
+    investigarLeadEmpresa(lead, geracao).then(mudou => {
+      empresaActivos--;
+      if (geracao !== empresaGeracao) return;
+      empresaFeitos++;
+      renderProgressoEmpresa();
+      /* só se redesenha quando algo mudou de facto: um render por
+         resposta vazia seria trabalho para nada em 25 respostas */
+      /* só se redesenha o que mudou, e o mapa não é reposicionado: o
+         utilizador pode estar a meio de uma escolha */
+      if (mudou) { computeFiltered(); renderTable(); renderKPIs(); atualizarPopupsEmpresa(); }
+      pumpFilaEmpresa(geracao);
+    });
+  }
+}
+
+/**
+ * Arranca a investigação. Só com a caixa ligada.
+ *
+ * Preserva a seleção e não mexe no mapa: o utilizador pode estar a
+ * meio de uma escolha quando as respostas começam a chegar.
+ */
+function startEmpresaEnrichment() {
+  if (IS_FILE) return;
+  if (state.currentSource === 'demo') return;
+  if (!state.filters || state.filters.enriquecerEmpresa !== true) return;
+  if (!state.leads.length) return;
+
+  empresaGeracao += 1;
+  const geracao = empresaGeracao;
+  const visiveis = new Set((state.filtered || []).map(l => l.id));
+  const candidatos = ordenarParaInvestigar(
+    [...state.leads].sort((a, b) => (visiveis.has(b.id) ? 1 : 0) - (visiveis.has(a.id) ? 1 : 0))
+  ).filter(l => estadoEmpresaLead(l.id) === 'POR_INVESTIGAR');
+
+  empresaFila = candidatos.slice(0, EMPRESA_MAX_LOTE);
+  empresaTotal = empresaFila.length;
+  empresaFeitos = 0;
+  empresaActivos = 0;
+  if (!empresaTotal) { renderProgressoEmpresa(); return; }
+  renderProgressoEmpresa();
+  pumpFilaEmpresa(geracao);
+}
+
+/** Uma pesquisa nova invalida tudo o que estava a decorrer. */
+function cancelarEnriquecimentoEmpresa() {
+  empresaGeracao += 1;
+  empresaFila = [];
+  empresaActivos = 0;
+  empresaFeitos = 0;
+  empresaTotal = 0;
+  empresaEstado.clear();
+  renderProgressoEmpresa();
+}
+
 /* API de depuração/manutenção exposta no browser */
 window.LeadMapPro = { state, CONFIG, NICHES, DataCleaner, Validator, runSearch, buildWorkbook, leadsToRows, MapProviders, PlacesProviders,
   socials: { enrichLeadSocials, startSocialEnrichment, getSocials, emptySocials, socialStatus, socialEnrichmentCache, socialEnrichmentInFlight, SOCIAL_CONCURRENCY },
@@ -5717,7 +5951,10 @@ window.LeadMapPro = { state, CONFIG, NICHES, DataCleaner, Validator, runSearch, 
     cumpreMinimoEmpresa, cumpreTextoEmpresa, avaliarEmpresa, temCriterioEmpresa,
     filtrosEmpresaVazios, scorePorte, lerFiltrosEmpresa, resumoFiltrosEmpresa,
     avaliarCriterioNumerico, avaliarCriterioTexto, classificarMatch,
-    STATUS_CRITERIO, MODOS_EMPRESA, evidenciasDeEmpresa } };
+    STATUS_CRITERIO, MODOS_EMPRESA, evidenciasDeEmpresa },
+  investigacao: { startEmpresaEnrichment, cancelarEnriquecimentoEmpresa, ordenarParaInvestigar,
+    aplicarEmpresaInvestigada, estadoEmpresaLead, EMPRESA_CONCURRENCY, EMPRESA_MAX_LOTE,
+    progresso: () => ({ feitos: empresaFeitos, total: empresaTotal, geracao: empresaGeracao }) } };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
