@@ -6,9 +6,20 @@
  *
  * Mesma arquitetura de api/enrich/socials.js: um único pedido à página
  * inicial, timeout de 5 s, teto de tamanho, só HTML, mesmas proteções
+ * PORQUE É `.mjs` E NÃO `.js`
+ * --------------------------
+ * `package.json` está no .gitignore, por isso o deployment não declara
+ * "type": "module". Sem essa declaração um `.js` é CommonJS, o `import` é
+ * transpilado para `require()`, e `require()` de um `.mjs` falha em
+ * runtime. Esta função passou a importar o validador de NIF, e a extensão
+ * `.mjs` torna-a ESM sem depender de configuração. O URL público
+ * `/api/enrich/email` não muda. NÃO renomear para `.js`.
+ *
  * SSRF. Nunca devolve o HTML bruto nem variáveis de ambiente, e nunca
  * inventa nem adivinha endereços — só devolve o que está publicado.
  */
+
+import { extrairNif } from '../../providers/company/nif.mjs';
 
 const TIMEOUT_MS = 5000;
 const MAX_URL_LEN = 2048;
@@ -180,15 +191,31 @@ export default async function handler(req, res) {
 
   const website = websiteSeguro(lead.website);
   if (!website) {
-    return res.status(200).json({ success: true, leadId, found: false, emails: [] });
+    /* sem website nada foi lido: o NIF fica por consultar, não "não
+       encontrado" — são coisas diferentes e a UI mostra-as diferentes */
+    return res.status(200).json({ success: true, leadId, found: false, emails: [], nif: null, paginaLida: false });
   }
 
   const html = await lerPagina(website);
   if (!html) {
-    return res.status(200).json({ success: true, leadId, found: false, emails: [] });
+    return res.status(200).json({ success: true, leadId, found: false, emails: [], nif: null, paginaLida: false });
   }
 
   let emails = [];
   try { emails = extrairEmails(html); } catch (e) { emails = []; }
-  return res.status(200).json({ success: true, leadId, found: emails.length > 0, emails });
+
+  /* O NIF sai do MESMO HTML que já foi descarregado para os emails: zero
+     pedidos adicionais, dentro das mesmas guardas de SSRF, timeout e
+     tamanho. `paginaLida` é o que autoriza o cliente a dizer "não
+     encontrado" em vez de "por consultar". */
+  let nif = null;
+  try {
+    const r = extrairNif(html);
+    if (r.encontrado) nif = { valor: r.nif, rotulo: r.rotulo, confianca: r.confianca, fonte: website };
+  } catch (e) { nif = null; }
+
+  return res.status(200).json({
+    success: true, leadId, found: emails.length > 0, emails,
+    nif, paginaLida: true
+  });
 }

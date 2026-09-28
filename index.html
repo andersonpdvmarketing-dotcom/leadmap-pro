@@ -1844,7 +1844,8 @@ function cleanLead(raw, center, dataPesquisa) {
     fontes: Array.isArray(raw.fontes) ? raw.fontes.slice() : [],   /* rasto multi-fonte */
     dataPesquisa,
     socials: emptySocials(),  /* preenchido depois, em segundo plano (secção 20) */
-    emails: []                /* preenchido depois, em segundo plano (secção 21) */
+    emails: [],               /* preenchido depois, em segundo plano (secção 21) */
+    empresa: semDadosEmpresa()  /* porte económico; preenchido depois (secção 22) */
   };
 }
 
@@ -4835,10 +4836,42 @@ function updateLeadEmailUI(id) {
   if (m && m.getPopup && m.getPopup()) m.setPopupContent(popupHtml(lead));
 }
 
+/**
+ * Escreve no envelope empresarial o NIF lido da página.
+ *
+ * Três desfechos, e a diferença entre eles é o que impede o ecrã de
+ * mentir: só se diz "não encontrado" quando a página foi mesmo lida e não
+ * tinha NIF reconhecível. Sem website, ou com o pedido falhado, o campo
+ * fica por consultar — ninguém procurou.
+ *
+ * Nunca se escreve um NIF que o servidor não tenha validado formalmente.
+ */
+function aplicarNifDaPagina(lead, registo) {
+  if (!lead) return;
+  if (!lead.empresa) lead.empresa = semDadosEmpresa();
+  const r = registo || {};
+  if (r.nif && typeof r.nif.valor === 'string') {
+    lead.empresa.nif = {
+      valor: r.nif.valor,
+      fonte: r.nif.fonte || (lead.website && lead.website !== ND ? lead.website : 'website'),
+      consultadoEm: new Date().toISOString(),
+      confianca: typeof r.nif.confianca === 'number' ? r.nif.confianca : null,
+      estado: 'CONFIRMADO'
+    };
+    return;
+  }
+  if (r.paginaLida === true) {
+    lead.empresa.nif = { valor: null, fonte: null, consultadoEm: null, confianca: null, estado: 'NAO_ENCONTRADO' };
+    return;
+  }
+  lead.empresa.nif = envelopeEmpresaVazio();   /* NAO_CONSULTADO */
+}
+
 function applyEmails(id, registo) {
   const lead = state.leads.find(l => l.id === id);
   if (!lead) return;
   lead.emails = registo.emails;
+  aplicarNifDaPagina(lead, registo);
   updateLeadEmailUI(id);
   renderKPIs();   /* o KPI "Com email" acompanha o enriquecimento, como o social */
   agendarSincronizacaoSnapshot();
@@ -4855,7 +4888,9 @@ async function enrichLeadEmail(lead) {
   let registo;
   try {
     if (!lead.website || lead.website === ND) {
-      registo = { emails: [], erro: false };                     /* sem website: nada a ler */
+      /* sem website nada foi lido: o NIF fica POR CONSULTAR, não
+         "não encontrado" — ninguém procurou */
+      registo = { emails: [], erro: false, nif: null, paginaLida: false };
     } else {
       const res = await fetchWithTimeout('/api/enrich/email', {
         method: 'POST',
@@ -4871,11 +4906,18 @@ async function enrichLeadEmail(lead) {
           limpo.push({ email: e.email.toLowerCase(), source: e.source || 'website' });
         }
       }
-      registo = { emails: limpo.slice(0, 5), erro: false };
+      /* o NIF vem do MESMO pedido: a página já foi descarregada para os
+         emails e não se faz um único pedido a mais por causa disto */
+      registo = {
+        emails: limpo.slice(0, 5), erro: false,
+        nif: (json.nif && typeof json.nif.valor === 'string') ? json.nif : null,
+        paginaLida: json.paginaLida === true
+      };
     }
   } catch (err) {
     console.warn('[Emails] falhou para', lead.id, err.message || err);
-    registo = { emails: [], erro: true };   /* um erro não afeta os outros leads */
+    /* falhou: não se sabe nada sobre a página, logo nada de "não encontrado" */
+    registo = { emails: [], erro: true, nif: null, paginaLida: false };
   } finally {
     emailEnrichmentInFlight.delete(lead.id);
   }
@@ -4917,10 +4959,83 @@ renderAll = function (opts) {
   try { startEmailEnrichment(); } catch (e) { console.warn('[Emails]', e); }
 };
 
+/* =====================================================================
+   22. PORTE EMPRESARIAL — modelo (Fase 1)
+   ---------------------------------------------------------------------
+   Só o modelo. Não há consulta, não há fornecedor ligado, não há filtros.
+   Os cinco campos nascem por consultar, e é assim que ficam até alguém
+   autorizar a fase seguinte.
+
+   PORQUE A FORMA ESTÁ AQUI E A LÓGICA ESTÁ NO MÓDULO
+   --------------------------------------------------
+   `cleanLead()` corre num bloco de script clássico, que não faz import.
+   A autoridade sobre estados, validação e envelopes é
+   `providers/company/contract.mjs`; aqui fica só a forma vazia, como
+   `emptySocials()` faz para as redes sociais. O teste "o modelo do ecrã
+   não diverge do contrato" compara as duas e falha se alguém mexer numa
+   e esquecer a outra.
+
+   AUSÊNCIA NÃO É ZERO
+   -------------------
+   Uma empresa sem dados de faturação não fatura zero: não se sabe quanto
+   fatura. Por isso `valor` fica a null e o estado diz porquê —
+   NAO_CONSULTADO enquanto ninguém procurou, NAO_ENCONTRADO só depois de
+   se ter mesmo procurado.
+   ===================================================================== */
+
+const CAMPOS_EMPRESA = ['nif', 'cae', 'funcionarios', 'faturacaoAnual', 'capitalSocial'];
+const ESTADOS_EMPRESA = ['CONFIRMADO', 'ESTIMADO', 'NAO_ENCONTRADO', 'NAO_CONSULTADO'];
+const ESTADOS_EMPRESA_COM_VALOR = ['CONFIRMADO', 'ESTIMADO'];
+
+function envelopeEmpresaVazio() {
+  return { valor: null, fonte: null, consultadoEm: null, confianca: null, estado: 'NAO_CONSULTADO' };
+}
+
+function semDadosEmpresa() {
+  const o = {};
+  for (const c of CAMPOS_EMPRESA) o[c] = envelopeEmpresaVazio();
+  return o;
+}
+
+/* Leitura tolerante: snapshots gravados antes desta fase não têm
+   `empresa`, e leem-se como "por consultar" — que é a verdade sobre
+   aquela geração. Um envelope incoerente (estado que suporta valor mas
+   sem valor) trata-se como ausente em vez de ser mostrado. */
+function getEmpresa(l) {
+  const base = semDadosEmpresa();
+  const e = l && l.empresa;
+  if (!e || typeof e !== 'object') return base;
+  for (const c of CAMPOS_EMPRESA) {
+    const v = e[c];
+    if (!v || typeof v !== 'object') continue;
+    if (!ESTADOS_EMPRESA.includes(v.estado)) continue;
+    const comValor = ESTADOS_EMPRESA_COM_VALOR.includes(v.estado);
+    if (comValor && v.valor == null) continue;
+    base[c] = {
+      valor: comValor ? v.valor : null,
+      fonte: comValor ? (v.fonte || null) : null,
+      consultadoEm: comValor ? (v.consultadoEm || null) : null,
+      confianca: comValor && typeof v.confianca === 'number' ? v.confianca : null,
+      estado: v.estado
+    };
+  }
+  return base;
+}
+
+/* O que o utilizador leria. Nenhum destes rótulos afirma mais do que se
+   sabe — e "Não encontrado" só aparece depois de se ter procurado. */
+function rotuloEmpresa(env) {
+  if (!env || env.estado === 'NAO_CONSULTADO') return 'Por consultar';
+  if (env.estado === 'NAO_ENCONTRADO') return 'Não encontrado';
+  if (env.estado === 'ESTIMADO') return 'Estimativa';
+  return 'Confirmado';
+}
+
 /* API de depuração/manutenção exposta no browser */
 window.LeadMapPro = { state, CONFIG, NICHES, DataCleaner, Validator, runSearch, buildWorkbook, leadsToRows, MapProviders, PlacesProviders,
   socials: { enrichLeadSocials, startSocialEnrichment, getSocials, emptySocials, socialStatus, socialEnrichmentCache, socialEnrichmentInFlight, SOCIAL_CONCURRENCY },
-  emails: { enrichLeadEmail, startEmailEnrichment, getEmails, emailStatus, emailEnrichmentCache, emailEnrichmentInFlight, EMAIL_CONCURRENCY } };
+  emails: { enrichLeadEmail, startEmailEnrichment, getEmails, emailStatus, emailEnrichmentCache, emailEnrichmentInFlight, EMAIL_CONCURRENCY },
+  empresa: { semDadosEmpresa, getEmpresa, rotuloEmpresa, CAMPOS_EMPRESA } };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
