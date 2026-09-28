@@ -506,7 +506,11 @@ table.leads { border-collapse: separate; border-spacing: 0; width: 100%; min-wid
 .modal-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.012em; flex: 1; }
 .modal-body { padding: 18px 20px 6px; display: flex; flex-direction: column; gap: 20px; }
 .fgroup legend, .fgroup-t { font-size: 12px; font-weight: 700; color: var(--text-2); letter-spacing: .015em; margin: 0 0 10px; padding: 0; }
-.fgroup { border: 0; margin: 0; padding: 0; }
+/* Um <fieldset> tem min-inline-size: min-content por omissão e por isso
+   cresce para caber conteúdo que não quebra, empurrando a modal para fora
+   do ecrã. Os outros fieldsets escapavam por conterem só campos
+   elásticos; a secção de porte tem rótulos com nowrap e expôs o quirk. */
+.fgroup { border: 0; margin: 0; padding: 0; min-width: 0; min-inline-size: 0; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .span2 { grid-column: 1 / -1; }
 .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
@@ -760,6 +764,91 @@ td.td-hist { white-space: nowrap; }
 }
 .sugestoes button:hover { background: var(--surface-3); border-color: var(--border-strong); color: var(--text); }
 .sugestoes button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+
+/* ---------- Porte e dados empresariais (secção colapsável) ----------
+   Reaproveita o desenho dos chips de sugestão. Fechada por omissão: a
+   maioria das pesquisas não usa critérios de porte, e uma parede de
+   filtros sempre aberta tornaria a modal impraticável no telemóvel. */
+.emp-box { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.emp-box > summary {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 11px 13px; list-style: none; border-radius: 10px;
+  font: 600 12.5px/1.3 var(--font); color: var(--text-2);
+}
+.emp-box > summary::-webkit-details-marker { display: none; }
+.emp-box > summary:hover { color: var(--text); }
+.emp-box > summary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 14%, transparent); }
+.emp-box > summary .ic { width: 15px; height: 15px; color: var(--faint); transition: transform .15s ease; flex: none; }
+.emp-box > summary > span:first-of-type { white-space: nowrap; flex: none; }
+.emp-box[open] > summary .ic { transform: rotate(90deg); }
+/* Resumo do que está escolhido, visível com a secção fechada. */
+.emp-resumo { margin-left: auto; font: 500 11.5px/1 var(--mono); color: var(--faint); text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.emp-resumo.ativo { color: var(--ink); }
+.emp-corpo { padding: 2px 13px 13px; display: grid; gap: 13px; }
+.emp-linha > label, .emp-linha .emp-rot { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+.emp-ops { display: flex; flex-wrap: wrap; gap: 6px; }
+.emp-ops button {
+  height: 28px; padding: 0 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  font: 500 12px/1 var(--font); color: var(--text-2);
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.emp-ops button:hover { background: var(--surface-3); border-color: var(--border-strong); color: var(--text); }
+.emp-ops button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.emp-custom { margin-top: 8px; max-width: 220px; }
+/* Aviso honesto: um critério sem fonte de dados não devolve ninguém. */
+.emp-aviso { display: flex; gap: 7px; align-items: flex-start; padding: 9px 11px; border-radius: 8px;
+  background: var(--warn-bg); color: var(--warn); font-size: 12px; line-height: 1.45; }
+.emp-aviso .ic { width: 14px; height: 14px; flex: none; margin-top: 1px; }
+.emp-nota { display: block; font-size: 11.5px; color: var(--faint); line-height: 1.45; margin-top: 2px; }
+.emp-check { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+.emp-check input { margin-top: 2px; flex: none; }
+.emp-check .emp-rot { margin: 0; }
+/* Bloco compacto no popup do mapa. */
+.pop-emp { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.pop-emp-t { font-size: 11px; font-weight: 700; color: var(--faint); letter-spacing: .02em; margin-bottom: 5px; }
+.emp-l { display: flex; align-items: center; gap: 7px; font-size: 12px; line-height: 1.7; }
+.emp-k { color: var(--muted); min-width: 74px; }
+.emp-v { color: var(--text); font-weight: 600; }
+.emp-tag { margin-left: auto; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
+.emp-tag.ok { color: var(--ok); background: var(--ok-bg); }
+.emp-tag.est { color: var(--warn); background: var(--warn-bg); }
+.emp-tag.conf { color: var(--danger); background: var(--danger-bg, var(--warn-bg)); }
+/* Critérios pedidos, com o estado de cada um. */
+.pop-crit { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.crit-l { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.7; }
+.crit-l.dim { color: var(--muted); }
+.crit-m { width: 13px; text-align: center; font-weight: 700; flex: none; }
+.crit-m.ok { color: var(--ok); }
+.crit-m.no { color: var(--danger); }
+.crit-m.un { color: var(--faint); }
+.crit-res { margin-top: 5px; font-size: 11.5px; font-weight: 700; }
+.crit-res.forte { color: var(--ok); }
+.crit-res.parcial { color: var(--warn); }
+.crit-res.inconclusivo { color: var(--faint); }
+.crit-res.nao_cumpre { color: var(--danger); }
+/* Coluna "Porte" da tabela: valor principal e, se houver, o aviso. */
+td.td-porte { white-space: nowrap; }
+.porte-row { display: inline-flex; align-items: center; gap: 6px; }
+.porte-m { font: 600 11.5px/1 var(--mono); padding: 2px 7px; border-radius: 999px; }
+.porte-m.forte { color: var(--ok); background: var(--ok-bg); }
+.porte-m.parcial { color: var(--warn); background: var(--warn-bg); }
+.porte-m.inconclusivo { color: var(--faint); background: var(--surface-3); }
+.porte-m.nao_cumpre { color: var(--danger); background: var(--warn-bg); }
+.porte-conf { font: 600 11px/1 var(--font); color: var(--danger); white-space: nowrap; cursor: help; }
+.porte-n { font-size: 11.5px; color: var(--muted); }
+/* Evidências, no popup. */
+.pop-evid { margin-top: 7px; }
+.evid-l { display: grid; grid-template-columns: auto 1fr; gap: 2px 7px; padding: 5px 0; border-top: 1px dashed var(--border); font-size: 11.5px; }
+.evid-v { font-weight: 700; color: var(--text); }
+.evid-meta { grid-column: 1 / -1; color: var(--faint); line-height: 1.5; }
+.evid-tipo { font: 600 10px/1 var(--font); padding: 1px 5px; border-radius: 999px; background: var(--surface-3); color: var(--muted); }
+@media (max-width: 560px) {
+  .emp-resumo { font-size: 11px; }
+  .emp-ops button { height: 30px; }        /* alvo de toque maior no telemóvel */
+  .emp-custom { max-width: 100%; }
+}
 .reveal { margin-top: 12px; }
 .modal-foot {
   display: flex; align-items: center; gap: 10px; padding: 14px 20px; margin-top: 6px;
@@ -994,6 +1083,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <th>Email</th>
             <th>Website</th>
             <th>Redes</th>
+            <th>Porte</th>
             <th class="sortable" data-sort="distanciaKm" aria-sort="ascending">Distância<svg class="ic sort-arrow" aria-hidden="true"><use href="#ic-caret"/></svg></th>
             <th>Fonte</th>
             <th>Histórico</th>
@@ -1227,6 +1317,119 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <button type="button" data-q="empresas de limpeza">Empresas de limpeza</button>
             <button type="button" data-q="restaurantes">Restaurantes</button>
           </div>
+        </fieldset>
+        <fieldset class="fgroup">
+          <legend>Porte e dados empresariais</legend>
+          <details class="emp-box" id="empBox">
+            <summary aria-controls="empCorpo">
+              <svg class="ic" aria-hidden="true"><use href="#ic-caret"/></svg>
+              <span>Filtros empresariais</span>
+              <span class="emp-resumo" id="empResumo">Sem critérios</span>
+            </summary>
+            <div class="emp-corpo" id="empCorpo">
+
+              <div class="emp-linha">
+                <span class="emp-rot" id="rotFunc">Funcionários</span>
+                <div class="emp-ops" id="opsFunc" role="group" aria-labelledby="rotFunc">
+                  <button type="button" data-v="" aria-pressed="true">Qualquer</button>
+                  <button type="button" data-v="10" aria-pressed="false">10+</button>
+                  <button type="button" data-v="30" aria-pressed="false">30+</button>
+                  <button type="button" data-v="50" aria-pressed="false">50+</button>
+                  <button type="button" data-v="100" aria-pressed="false">100+</button>
+                  <button type="button" data-v="250" aria-pressed="false">250+</button>
+                  <button type="button" data-v="custom" aria-pressed="false">Personalizado</button>
+                </div>
+                <div class="emp-custom field" id="custFuncWrap" hidden>
+                  <label for="custFunc">Mínimo de funcionários</label>
+                  <input type="number" id="custFunc" min="0" step="1" inputmode="numeric" placeholder="ex.: 35">
+                </div>
+              </div>
+
+              <div class="emp-linha">
+                <span class="emp-rot" id="rotFat">Faturação anual</span>
+                <div class="emp-ops" id="opsFat" role="group" aria-labelledby="rotFat">
+                  <button type="button" data-v="" aria-pressed="true">Qualquer</button>
+                  <button type="button" data-v="100000" aria-pressed="false">€100 mil+</button>
+                  <button type="button" data-v="250000" aria-pressed="false">€250 mil+</button>
+                  <button type="button" data-v="500000" aria-pressed="false">€500 mil+</button>
+                  <button type="button" data-v="1000000" aria-pressed="false">€1 milhão+</button>
+                  <button type="button" data-v="5000000" aria-pressed="false">€5 milhões+</button>
+                  <button type="button" data-v="custom" aria-pressed="false">Personalizado</button>
+                </div>
+                <div class="emp-custom field" id="custFatWrap" hidden>
+                  <label for="custFat">Faturação mínima (€)</label>
+                  <input type="number" id="custFat" min="0" step="1000" inputmode="numeric" placeholder="ex.: 750000">
+                </div>
+              </div>
+
+              <div class="emp-linha">
+                <span class="emp-rot" id="rotCap">Capital social</span>
+                <div class="emp-ops" id="opsCap" role="group" aria-labelledby="rotCap">
+                  <button type="button" data-v="" aria-pressed="true">Qualquer</button>
+                  <button type="button" data-v="5000" aria-pressed="false">€5 mil+</button>
+                  <button type="button" data-v="10000" aria-pressed="false">€10 mil+</button>
+                  <button type="button" data-v="50000" aria-pressed="false">€50 mil+</button>
+                  <button type="button" data-v="100000" aria-pressed="false">€100 mil+</button>
+                  <button type="button" data-v="500000" aria-pressed="false">€500 mil+</button>
+                  <button type="button" data-v="custom" aria-pressed="false">Personalizado</button>
+                </div>
+                <div class="emp-custom field" id="custCapWrap" hidden>
+                  <label for="custCap">Capital social mínimo (€)</label>
+                  <input type="number" id="custCap" min="0" step="1000" inputmode="numeric" placeholder="ex.: 75000">
+                </div>
+              </div>
+
+              <div class="grid2">
+                <div class="field">
+                  <label for="fCae">CAE / Atividade económica</label>
+                  <input type="text" id="fCae" autocomplete="off" maxlength="60" placeholder="ex.: 41200 ou construção">
+                </div>
+                <div class="field">
+                  <label for="fEstadoEmp">Estado da empresa</label>
+                  <select id="fEstadoEmp">
+                    <option value="">Qualquer</option>
+                    <option value="ATIVA">Ativa</option>
+                    <option value="INSOLVENCIA">Insolvência</option>
+                    <option value="ENCERRADA">Encerrada</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="emp-linha">
+                <span class="emp-rot" id="rotModo">Modo de correspondência</span>
+                <div class="emp-ops" id="opsModo" role="group" aria-labelledby="rotModo">
+                  <button type="button" data-v="INTELIGENTE" aria-pressed="true">Inteligente</button>
+                  <button type="button" data-v="ESTRITO" aria-pressed="false">Estrito</button>
+                  <button type="button" data-v="EXPLORATORIO" aria-pressed="false">Exploratório</button>
+                </div>
+                <div class="fhint" id="modoDescricao">Exclui quem comprovadamente não cumpre. Mantém quem ainda está por investigar.</div>
+              </div>
+
+              <div class="field">
+                <label for="fQualidade">Qualidade dos dados</label>
+                <select id="fQualidade">
+                  <option value="CONFIRMADO">Somente confirmados</option>
+                  <option value="CONFIRMADO_ESTIMADO" selected>Confirmados + estimados</option>
+                  <option value="TODOS">Todos os dados disponíveis</option>
+                </select>
+                <div class="fhint">Um critério nunca é satisfeito por um dado em falta, seja qual for esta opção.</div>
+              </div>
+
+              <label class="emp-check">
+                <input type="checkbox" id="fEnriquecer">
+                <span>
+                  <span class="emp-rot">Enriquecer resultados com dados empresariais</span>
+                  <span class="emp-nota">Alguns dados empresariais dependem das fontes disponíveis.</span>
+                </span>
+              </label>
+
+              <div class="emp-aviso" id="empAviso" hidden role="status">
+                <svg class="ic" aria-hidden="true"><use href="#ic-info"/></svg>
+                <span id="empAvisoTexto"></span>
+              </div>
+
+            </div>
+          </details>
         </fieldset>
         <fieldset class="fgroup">
           <legend>Localização central</legend>
@@ -1554,6 +1757,10 @@ const MAIN_NICHES = ['imobiliario', 'saude', 'estetica', 'automovel'];
 
 /* ---------- 2. Estado ---------- */
 const state = {
+  /* avaliação de porte por lead (id → resultado de avaliarEmpresa), para
+     o ecrã marcar cada critério sem reavaliar; vazio sem critérios */
+  avaliacaoPorte: new Map(),
+  excluidosPorte: 0,
   center: { ...CONFIG.defaultCenter },
   centerMeta: { ...CONFIG.defaultMeta },
   radiusKm: CONFIG.defaultRadiusKm,
@@ -3150,7 +3357,13 @@ async function runSearch(p) {
 
     /* limpar filtros/seleção antes dos primeiros resultados (render progressivo) */
     state.selected.clear();
-    state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false, distrito: '', concelho: '', tipo: '', historico: '' };
+    /* os critérios de porte vêm da modal e sobrevivem a este reset: foram
+       escolhidos PARA esta pesquisa, não são um filtro de ecrã */
+    state.filters = { text: '', niches: new Set(Object.keys(NICHES)), phoneOnly: false, siteOnly: false,
+      distrito: '', concelho: '', tipo: '', historico: '',
+      ...filtrosEmpresaVazios(), ...(p.empresa || {}) };
+    state.excluidosPorte = 0;
+    state.avaliacaoPorte = new Map();
     $('#tableFilter').value = '';
     $('#filtroTipo').value = '';
     $('#filtroHistorico').value = '';
@@ -3383,6 +3596,106 @@ function historicoHtml(l) {
     linhas.map(([r, v]) => '<dt>' + r + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>';
 }
 
+/* Bloco "Dados empresariais" do popup.
+   Só mostra campos que têm mesmo alguma coisa. Quatro linhas de "Por
+   consultar" não são informação — são ruído a ocupar o espaço de quem
+   está a decidir se liga a esta empresa. Hoje isso significa, na
+   prática, o NIF e mais nada. */
+function empresaHtml(l) {
+  const e = getEmpresa(l);
+  const ROT = { nif: 'NIF', cae: 'CAE', funcionarios: 'Funcionários',
+                faturacaoAnual: 'Faturação anual', capitalSocial: 'Capital social' };
+  const linhas = [];
+  for (const c of CAMPOS_EMPRESA) {
+    const v = e[c];
+    if (!v || v.valor == null) continue;
+    const valor = (c === 'faturacaoAnual' || c === 'capitalSocial')
+      ? fmtEuroCurto(Number(v.valor)) : String(v.valor);
+    /* uma estimativa tem de se anunciar como tal, sempre */
+    const marca = v.estado === 'ESTIMADO' ? '<span class="emp-tag est">Estimativa</span>'
+      : v.estado === 'CONFLITO' ? '<span class="emp-tag conf">Fontes divergem</span>'
+      : '<span class="emp-tag ok">Confirmado</span>';
+    linhas.push('<div class="emp-l"><span class="emp-k">' + ROT[c] + '</span>' +
+      '<span class="emp-v mono">' + esc(valor) + '</span>' + marca + '</div>');
+    /* Aqui, ao contrário da tabela, mostra-se tudo: quem abre os detalhes
+       quer perceber de onde veio o número, e num conflito precisa de ver
+       as duas afirmações para decidir em qual acredita. */
+    linhas.push(evidenciasHtml(e[c]));
+  }
+  const criterios = criteriosHtml(l);
+  if (!linhas.length && !criterios) return '';
+  const corpo = (linhas.length
+    ? '<div class="pop-emp-t">Dados empresariais</div>' + linhas.join('')
+    : '');
+  return '<div class="pop-emp">' + corpo + criterios + '</div>';
+}
+
+/**
+ * As evidências de um campo: valor, fonte, data, confiança, estado e
+ * tipo de fonte.
+ *
+ * Só aparece quando há mais do que uma, ou quando há conflito — com uma
+ * única fonte concordante, repetir a mesma informação por baixo do valor
+ * seria ruído.
+ */
+function evidenciasHtml(campo) {
+  const evs = evidenciasDeEmpresa(campo);
+  if (evs.length < 2 && !(campo && campo.estado === 'CONFLITO')) return '';
+  const TIPO = {
+    SITE_OFICIAL: 'Site oficial', FONTE_OFICIAL: 'Fonte oficial', DADO_ABERTO: 'Dado aberto',
+    DIRETORIO: 'Diretório', API: 'API', PROVIDER_COMERCIAL: 'Fornecedor comercial', OUTRO: 'Outra'
+  };
+  const linhas = evs.map(ev => {
+    const meta = [
+      ev.fonte ? esc(String(ev.fonte)) : null,
+      ev.consultadoEm ? esc(fmtDataCurta(ev.consultadoEm)) : null,
+      typeof ev.confianca === 'number' ? 'confiança ' + Math.round(ev.confianca * 100) + '%' : null,
+      esc(rotuloEmpresa(ev))
+    ].filter(Boolean).join(' · ');
+    const url = ev.url ? '<a href="' + esc(ev.url) + '" target="_blank" rel="noopener">ver</a>' : '';
+    return '<div class="evid-l">' +
+      '<span class="evid-tipo">' + esc(TIPO[ev.tipoFonte] || ev.tipoFonte || '—') + '</span>' +
+      '<span class="evid-v mono">' + esc(String(ev.valor)) + '</span>' +
+      '<span class="evid-meta">' + meta + (url ? ' · ' + url : '') + '</span></div>';
+  });
+  return '<div class="pop-evid">' + linhas.join('') + '</div>';
+}
+
+/**
+ * Como esta empresa se comporta face aos critérios pedidos.
+ *
+ * Nunca escreve "cumpre X" sobre algo que não foi verificado: um critério
+ * por investigar aparece com "?" e a palavra "não encontrada". A
+ * diferença entre "não cumpre" e "não se sabe" é a razão de existir
+ * deste bloco.
+ */
+function criteriosHtml(l) {
+  const a = state.avaliacaoPorte.get(l.id);
+  if (!a || !a.total) return '';
+  const ROT = { funcionarios: 'funcionários', faturacaoAnual: 'faturação',
+                capitalSocial: 'capital', cae: 'CAE', estadoEmpresa: 'estado' };
+  const f = state.filters;
+  const alvo = {
+    funcionarios: f.minFuncionarios != null ? f.minFuncionarios + '+ ' : '',
+    faturacaoAnual: f.minFaturacaoAnual != null ? fmtEuroCurto(f.minFaturacaoAnual) + '+ ' : '',
+    capitalSocial: f.minCapitalSocial != null ? fmtEuroCurto(f.minCapitalSocial) + '+ ' : '',
+    cae: '', estadoEmpresa: ''
+  };
+  const linhas = Object.entries(a.status).map(([campo, st]) => {
+    const marca = st === 'CUMPRE' ? '<span class="crit-m ok">✓</span>'
+      : st === 'NAO_CUMPRE' ? '<span class="crit-m no">✗</span>'
+      : '<span class="crit-m un">?</span>';
+    const texto = st === 'DESCONHECIDO'
+      ? ROT[campo] + ': informação não encontrada'
+      : (alvo[campo] || '') + ROT[campo];
+    return '<div class="crit-l' + (st === 'DESCONHECIDO' ? ' dim' : '') + '">' + marca + esc(texto) + '</div>';
+  });
+  const resumo = MATCH_ROTULO_EMPRESA[a.match] + ' — ' + a.confirmados + ' de ' + a.total +
+    (a.total === 1 ? ' critério confirmado' : ' critérios confirmados');
+  return '<div class="pop-crit"><div class="pop-emp-t">Critérios</div>' + linhas.join('') +
+    '<div class="crit-res ' + a.match.toLowerCase() + '">' + esc(resumo) + '</div></div>';
+}
+
 function popupHtml(l) {
   let h = '<div class="pop">';
   h += '<div>' + nicheBadge(l) + '</div>';
@@ -3391,6 +3704,7 @@ function popupHtml(l) {
   if (l.telefone !== ND) h += '<div class="pop-line mono">' + esc(l.telefone) + '</div>';
   if (l.telemovel !== ND) h += '<div class="pop-line mono">' + esc(l.telemovel) + '</div>';
   h += digitalHtml(l);
+  h += empresaHtml(l);
   h += historicoHtml(l);
   h += '<div class="pop-meta mono">' + fmtKm(l.distanciaKm) + ' km · ' + esc(fonteLabel(l)) + '</div>';
   h += '<div class="pop-actions"><a class="pop-btn" target="_blank" rel="noopener" href="' + gmapsUrl(l) + '">Abrir no Google Maps</a>';
@@ -3402,6 +3716,10 @@ function popupHtml(l) {
 function computeFiltered() {
   const f = state.filters;
   const txt = normalizeStr(f.text.trim());
+  /* quantos caíram por falta de dados empresariais — a interface usa isto
+     para explicar uma lista vazia em vez de a deixar parecer avaria */
+  let excluidosPorte = 0;
+  const comCriterioEmpresa = temCriterioEmpresa(f);
   let list = state.leads.filter(l => {
     if (!f.niches.has(l.nicho)) return false;
     if (f.phoneOnly && l.telefone === ND && l.telemovel === ND) return false;
@@ -3414,8 +3732,31 @@ function computeFiltered() {
       const hay = normalizeStr([l.nome, l.segmento, l.morada, l.localidade, l.codigoPostal].join(' '));
       if (!hay.includes(txt)) return false;
     }
+    /* Porte por último: é o critério mais caro e o único que precisa de
+       contar exclusões. Sem critérios ativos nem chega a correr, e a
+       pesquisa comporta-se exatamente como antes desta fase. */
+    if (comCriterioEmpresa) {
+      const r = avaliarEmpresa(getEmpresa(l), f);
+      /* guardada para o ecrã poder marcar cada critério sem reavaliar */
+      state.avaliacaoPorte.set(l.id, r);
+      if (!r.passa) {
+        if (r.naoCumpre === 0) excluidosPorte++;   /* saiu por se desconhecer, não por falhar */
+        return false;
+      }
+    }
     return true;
   });
+  state.excluidosPorte = excluidosPorte;
+  /* Com critérios de porte, quem tem mais evidência aparece primeiro; a
+     ordenação escolhida decide os empates. Sem critérios nada muda. */
+  if (comCriterioEmpresa && f.modoCorrespondencia !== 'ESTRITO') {
+    list = list
+      .map((l, i) => ({ l, i, forca: (state.avaliacaoPorte.get(l.id) || { forca: 0 }).forca }))
+      .sort((x, y) => (y.forca - x.forca) || (x.i - y.i))
+      .map(x => x.l);
+    state.filtered = list;
+    return;
+  }
   const { key, dir } = state.sort;
   const mul = dir === 'desc' ? -1 : 1;
   list.sort((a, b) => {
@@ -3428,6 +3769,41 @@ function computeFiltered() {
 }
 
 /* Coluna "Redes": indicadores compactos IG/FB/TT/YT/LI + estado do enriquecimento */
+/**
+ * Coluna "Porte" — compacta de propósito.
+ *
+ * Na tabela mostra-se só o valor principal e, quando as fontes divergem,
+ * um aviso. Dois números na mesma célula não cabem nem se leem: as
+ * evidências todas vivem no popup, que é onde alguém vai quando quer
+ * perceber de onde veio um número.
+ */
+function porteCell(l) {
+  const e = getEmpresa(l);
+  const emConflito = CAMPOS_EMPRESA.filter(c => e[c] && e[c].estado === 'CONFLITO');
+  const a = state.avaliacaoPorte.get(l.id);
+  const pedacos = [];
+
+  if (a && a.total) {
+    const cls = a.match.toLowerCase();
+    const marca = a.match === 'FORTE' ? '✓' : a.match === 'NAO_CUMPRE' ? '✗' : a.match === 'PARCIAL' ? '◐' : '?';
+    pedacos.push('<span class="porte-m ' + cls + '" title="' + esc(MATCH_ROTULO_EMPRESA[a.match] +
+      ' — ' + a.confirmados + ' de ' + a.total + ' confirmados') + '">' + marca + ' ' +
+      a.confirmados + '/' + a.total + '</span>');
+  }
+  if (emConflito.length) {
+    pedacos.push('<span class="porte-conf" title="Fontes divergem sobre ' +
+      esc(emConflito.join(', ')) + '. Ver detalhes.">⚠ Conflito</span>');
+  }
+  if (!pedacos.length) {
+    /* sem critérios e sem conflito, mostra-se o que existir de concreto */
+    const comValor = CAMPOS_EMPRESA.filter(c => e[c] && e[c].valor != null);
+    if (!comValor.length) return '<span class="nd">' + ND + '</span>';
+    return '<span class="porte-n mono" title="' + esc(comValor.join(', ')) + '">' + comValor.length +
+      (comValor.length === 1 ? ' dado' : ' dados') + '</span>';
+  }
+  return '<span class="porte-row">' + pedacos.join('') + '</span>';
+}
+
 function socCell(l) {
   const estado = socialStatus(l.id);
   if (estado === 'loading') return '<span class="soc-status"><span class="soc-dot"></span>A analisar…</span>';
@@ -3493,6 +3869,7 @@ function renderTable(opts) {
     h += '<td class="td-site">' + (l.website === ND ? '<span class="nd">' + ND + '</span>'
       : '<a href="' + esc(l.website) + '" target="_blank" rel="noopener" title="' + esc(l.website) + '">' + esc(hostOf(l.website) || l.website) + '</a>') + '</td>';
     h += '<td class="td-soc">' + socCell(l) + '</td>';
+    h += '<td class="td-porte">' + porteCell(l) + '</td>';
     h += '<td class="td-num">' + fmtKm(l.distanciaKm) + ' km</td>';
     h += '<td class="td-src" title="' + esc(fonteLabel(l)) + '">' + esc(fonteLabel(l)) + '</td>';
     h += '<td class="td-hist">' + histCell(l) + '</td>';
@@ -3653,7 +4030,15 @@ function toggleEmptyState() {
   if (show) {
     if (state.hasSearched) {
       $('#emptyTitle').textContent = 'Sem resultados nesta área';
-      $('#emptyText').textContent = 'Experimente aumentar o raio ou descrever a atividade de outra forma (ex.: “canalizadores” em vez de “picheleiros”). As fontes públicas nem sempre cobrem todos os negócios.';
+      /* Uma lista vazia por falta de dados empresariais não é o mesmo que
+         uma pesquisa sem resultados: houve leads, foram excluídos por não
+         se saber o seu porte. Dizer isso evita que pareça uma avaria. */
+      $('#emptyText').textContent = state.excluidosPorte > 0
+        ? state.excluidosPorte + (state.excluidosPorte === 1
+            ? ' lead foi excluída por não haver dados empresariais que confirmem os critérios de porte.'
+            : ' leads foram excluídas por não haver dados empresariais que confirmem os critérios de porte.') +
+          ' Retire os filtros de porte para as ver — só o NIF é recolhido nesta fase.'
+        : 'Experimente aumentar o raio ou descrever a atividade de outra forma (ex.: “canalizadores” em vez de “picheleiros”). As fontes públicas nem sempre cobrem todos os negócios.';
     } else {
       $('#emptyTitle').textContent = 'Defina o território e comece a prospeção';
       $('#emptyText').textContent = 'Escolha localização, raio e o que pretende pesquisar em "Nova Pesquisa".';
@@ -4304,6 +4689,137 @@ function getRadiusValue() {
   return Number(sel.value);
 }
 
+/* ---------- Secção "Porte e dados empresariais" da modal ----------
+   Os campos que ainda não têm fornecedor nenhum. Escolher um critério
+   sobre eles é legítimo — e vai excluir toda a gente, porque ausência
+   nunca satisfaz um critério. A interface diz isso ANTES de a pesquisa
+   correr, em vez de devolver zero resultados sem explicação. */
+const CAMPOS_EMPRESA_SEM_FONTE = {
+  funcionarios: 'funcionários',
+  faturacaoAnual: 'faturação',
+  capitalSocial: 'capital social',
+  cae: 'CAE',
+  estadoEmpresa: 'estado da empresa'
+};
+
+const MODO_DESCRICAO_EMPRESA = {
+  ESTRITO: 'Só empresas com todos os critérios confirmados.',
+  INTELIGENTE: 'Exclui quem comprovadamente não cumpre. Mantém quem ainda está por investigar.',
+  EXPLORATORIO: 'Mostra tudo o que foi descoberto, marcando o que já se sabe de cada empresa.'
+};
+
+const GRUPOS_EMPRESA = [
+  { ops: '#opsFunc', wrap: '#custFuncWrap', input: '#custFunc', chave: 'minFuncionarios' },
+  { ops: '#opsFat',  wrap: '#custFatWrap',  input: '#custFat',  chave: 'minFaturacaoAnual' },
+  { ops: '#opsCap',  wrap: '#custCapWrap',  input: '#custCap',  chave: 'minCapitalSocial' }
+];
+
+/* Lê a secção. Nunca devolve NaN: um campo personalizado por preencher
+   vale o mesmo que "Qualquer". */
+function lerFiltrosEmpresa() {
+  const f = filtrosEmpresaVazios();
+  for (const g of GRUPOS_EMPRESA) {
+    const activo = $(g.ops).querySelector('button[aria-pressed="true"]');
+    const v = activo ? activo.dataset.v : '';
+    if (v === 'custom') {
+      const bruto = $(g.input).value.trim();
+      const n = Number(bruto);
+      f[g.chave] = (bruto !== '' && Number.isFinite(n) && n >= 0) ? Math.floor(n) : null;
+    } else {
+      f[g.chave] = v ? Number(v) : null;
+    }
+  }
+  f.caeQuery = $('#fCae').value.trim();
+  f.estadoEmpresa = $('#fEstadoEmp').value;
+  f.qualidadeDados = $('#fQualidade').value || 'CONFIRMADO_ESTIMADO';
+  const modo = $('#opsModo').querySelector('button[aria-pressed="true"]');
+  f.modoCorrespondencia = modo ? modo.dataset.v : 'INTELIGENTE';
+  f.enriquecerEmpresa = $('#fEnriquecer').checked;
+  return f;
+}
+
+function fmtEuroCurto(n) {
+  if (n >= 1000000) return '\u20ac' + String(n / 1000000).replace('.', ',') + 'M';
+  if (n >= 1000) return '\u20ac' + Math.round(n / 1000) + 'k';
+  return '\u20ac' + n;
+}
+
+/* Resumo compacto, visível com a secção fechada. */
+function resumoFiltrosEmpresa(f) {
+  const p = [];
+  if (f.minFuncionarios != null) p.push(f.minFuncionarios + '+ funcionários');
+  if (f.minFaturacaoAnual != null) p.push(fmtEuroCurto(f.minFaturacaoAnual) + '+ faturação');
+  if (f.minCapitalSocial != null) p.push(fmtEuroCurto(f.minCapitalSocial) + '+ capital');
+  if (f.caeQuery) p.push('CAE ' + f.caeQuery);
+  if (f.estadoEmpresa) p.push({ ATIVA: 'Ativa', INSOLVENCIA: 'Insolvência', ENCERRADA: 'Encerrada' }[f.estadoEmpresa] || f.estadoEmpresa);
+  return p;
+}
+
+function listaPt(xs) {
+  if (xs.length === 1) return xs[0];
+  return xs.slice(0, -1).join(', ') + ' e ' + xs[xs.length - 1];
+}
+
+/* Actualiza resumo, campos personalizados e o aviso de falta de fonte. */
+function actualizarSeccaoEmpresa() {
+  for (const g of GRUPOS_EMPRESA) {
+    const activo = $(g.ops).querySelector('button[aria-pressed="true"]');
+    $(g.wrap).hidden = !(activo && activo.dataset.v === 'custom');
+  }
+  const f = lerFiltrosEmpresa();
+  const partes = resumoFiltrosEmpresa(f);
+  const res = $('#empResumo');
+  res.textContent = partes.length ? partes.join(' · ') : 'Sem critérios';
+  res.classList.toggle('ativo', partes.length > 0);
+
+  $('#modoDescricao').textContent = MODO_DESCRICAO_EMPRESA[f.modoCorrespondencia] || '';
+
+  const semFonte = [];
+  if (f.minFuncionarios != null) semFonte.push(CAMPOS_EMPRESA_SEM_FONTE.funcionarios);
+  if (f.minFaturacaoAnual != null) semFonte.push(CAMPOS_EMPRESA_SEM_FONTE.faturacaoAnual);
+  if (f.minCapitalSocial != null) semFonte.push(CAMPOS_EMPRESA_SEM_FONTE.capitalSocial);
+  if (f.caeQuery) semFonte.push(CAMPOS_EMPRESA_SEM_FONTE.cae);
+  if (f.estadoEmpresa) semFonte.push(CAMPOS_EMPRESA_SEM_FONTE.estadoEmpresa);
+  const aviso = $('#empAviso');
+  if (semFonte.length) {
+    /* O que acontece a seguir depende do modo, e a diferença é grande:
+       em estrito uma pesquisa destas não devolve nada; nos outros as
+       empresas ficam, marcadas como por investigar. */
+    $('#empAvisoTexto').textContent = f.modoCorrespondencia === 'ESTRITO'
+      ? 'Ainda não há fonte de dados para ' + listaPt(semFonte) + '. No modo estrito só entram ' +
+        'empresas com todos os critérios confirmados, por isso esta pesquisa não vai devolver ' +
+        'resultados. Experimente o modo inteligente.'
+      : 'Ainda não há fonte de dados para ' + listaPt(semFonte) + '. As empresas continuam a ' +
+        'aparecer, marcadas como “por investigar” nesses critérios — nenhuma é dada como ' +
+        'cumprindo o que não foi verificado.';
+    aviso.hidden = false;
+  } else {
+    aviso.hidden = true;
+  }
+}
+
+function ligarSeccaoEmpresa() {
+  for (const g of GRUPOS_EMPRESA) {
+    $(g.ops).addEventListener('click', ev => {
+      const b = ev.target.closest('button'); if (!b) return;
+      $(g.ops).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      if (b.dataset.v === 'custom') setTimeout(() => $(g.input).focus(), 0);
+      actualizarSeccaoEmpresa();
+    });
+    $(g.input).addEventListener('input', actualizarSeccaoEmpresa);
+  }
+  $('#opsModo').addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    $('#opsModo').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    actualizarSeccaoEmpresa();
+  });
+  for (const id of ['#fCae', '#fEstadoEmp', '#fQualidade', '#fEnriquecer']) {
+    $(id).addEventListener('input', actualizarSeccaoEmpresa);
+    $(id).addEventListener('change', actualizarSeccaoEmpresa);
+  }
+  actualizarSeccaoEmpresa();
+}
+
 function onSearchSubmit(e) {
   e.preventDefault();
   if (!Validator.validateForm()) return;
@@ -4324,6 +4840,7 @@ function onSearchSubmit(e) {
     shortLabel: [morada, cidade].filter(Boolean).join(', '),
     lat: state.center.lat, lon: state.center.lon, label: state.center.label,
     radiusKm, nicheKeys, keyword,
+    empresa: lerFiltrosEmpresa(),
     demo: IS_FILE
   });
 }
@@ -4358,6 +4875,7 @@ function bindEvents() {
 
   /* Modal de pesquisa */
   $('#searchForm').addEventListener('submit', onSearchSubmit);
+  ligarSeccaoEmpresa();
   $$('#searchModal [data-close]').forEach(b => b.addEventListener('click', () => closeModal($('#searchModal'))));
   $('#searchModal').addEventListener('mousedown', e => { if (e.target === e.currentTarget) closeModal($('#searchModal')); });
   ['fQuery', 'fMorada', 'fCP', 'fCidade', 'fRaioCustom'].forEach(id => {
@@ -4984,8 +5502,8 @@ renderAll = function (opts) {
    ===================================================================== */
 
 const CAMPOS_EMPRESA = ['nif', 'cae', 'funcionarios', 'faturacaoAnual', 'capitalSocial'];
-const ESTADOS_EMPRESA = ['CONFIRMADO', 'ESTIMADO', 'NAO_ENCONTRADO', 'NAO_CONSULTADO'];
-const ESTADOS_EMPRESA_COM_VALOR = ['CONFIRMADO', 'ESTIMADO'];
+const ESTADOS_EMPRESA = ['CONFIRMADO', 'ESTIMADO', 'NAO_ENCONTRADO', 'NAO_CONSULTADO', 'CONFLITO'];
+const ESTADOS_EMPRESA_COM_VALOR = ['CONFIRMADO', 'ESTIMADO', 'CONFLITO'];
 
 function envelopeEmpresaVazio() {
   return { valor: null, fonte: null, consultadoEm: null, confianca: null, estado: 'NAO_CONSULTADO' };
@@ -5018,6 +5536,9 @@ function getEmpresa(l) {
       confianca: comValor && typeof v.confianca === 'number' ? v.confianca : null,
       estado: v.estado
     };
+    /* as evidências são a razão de o conflito ser inspecionável: uma
+       leitura que as deitasse fora tornaria o estado CONFLITO opaco */
+    if (Array.isArray(v.evidencias) && v.evidencias.length) base[c].evidencias = v.evidencias;
   }
   return base;
 }
@@ -5028,14 +5549,175 @@ function rotuloEmpresa(env) {
   if (!env || env.estado === 'NAO_CONSULTADO') return 'Por consultar';
   if (env.estado === 'NAO_ENCONTRADO') return 'Não encontrado';
   if (env.estado === 'ESTIMADO') return 'Estimativa';
+  if (env.estado === 'CONFLITO') return 'Fontes divergem';
   return 'Confirmado';
+}
+
+/* Leitura tolerante do campo, preservando as evidências quando existem.
+   Um campo da Fase 1 (sem `evidencias`) continua a ler-se na mesma. */
+function evidenciasDeEmpresa(campo) {
+  return (campo && Array.isArray(campo.evidencias)) ? campo.evidencias : [];
+}
+
+/* ---------- Filtros de porte (Fase 2) ----------
+   Espelho de providers/company/filters.mjs, que é a autoridade e onde os
+   testes vivem. O bloco clássico não faz import; o teste "os filtros do
+   ecrã não divergem do módulo" segura as duas versões juntas.
+
+   A regra sem exceções: ausência de dado NUNCA satisfaz um critério. Uma
+   empresa cujos funcionários ninguém consultou não tem zero funcionários
+   — tem funcionários desconhecidos, e desconhecido não é maior nem menor
+   do que 30. */
+const ESTADOS_ACEITES_EMPRESA = {
+  /* CONFLITO tem valor, mas é um valor que duas fontes disputam: não
+     conta como confirmado. Entra no nível que aceita dados não assentes. */
+  CONFIRMADO: ['CONFIRMADO'],
+  CONFIRMADO_ESTIMADO: ['CONFIRMADO', 'ESTIMADO'],
+  TODOS: ['CONFIRMADO', 'ESTIMADO', 'CONFLITO']
+};
+
+function estadosAceitesEmpresa(q) {
+  return ESTADOS_ACEITES_EMPRESA[q] || ESTADOS_ACEITES_EMPRESA.CONFIRMADO_ESTIMADO;
+}
+
+function cumpreMinimoEmpresa(env, minimo, qualidade) {
+  if (minimo == null || minimo === '') return true;
+  const min = Number(minimo);
+  if (!Number.isFinite(min)) return true;
+  if (!env || typeof env !== 'object') return false;
+  if (!estadosAceitesEmpresa(qualidade).includes(env.estado)) return false;
+  if (env.valor == null) return false;
+  const v = Number(env.valor);
+  return Number.isFinite(v) && v >= min;
+}
+
+function cumpreTextoEmpresa(env, procura, qualidade) {
+  const q = String(procura == null ? '' : procura).trim();
+  if (!q) return true;
+  if (!env || typeof env !== 'object') return false;
+  if (!estadosAceitesEmpresa(qualidade).includes(env.estado)) return false;
+  if (env.valor == null) return false;
+  return normalizeStr(String(env.valor)).includes(normalizeStr(q));
+}
+
+function filtrosEmpresaVazios() {
+  return {
+    minFuncionarios: null, minFaturacaoAnual: null, minCapitalSocial: null,
+    caeQuery: '', estadoEmpresa: '', qualidadeDados: 'CONFIRMADO_ESTIMADO',
+    modoCorrespondencia: 'INTELIGENTE', enriquecerEmpresa: false
+  };
+}
+
+/* `qualidadeDados` e `enriquecerEmpresa` não contam como critério: o
+   primeiro modula, o segundo é intenção de recolha. Sem critério nenhum
+   a pesquisa comporta-se exatamente como antes desta fase. */
+function temCriterioEmpresa(f) {
+  if (!f) return false;
+  return f.minFuncionarios != null || f.minFaturacaoAnual != null || f.minCapitalSocial != null ||
+    Boolean(String(f.caeQuery || '').trim()) || Boolean(String(f.estadoEmpresa || '').trim());
+}
+
+/* Três respostas, não duas. "Não sei" não é "não cumpre": tratá-los da
+   mesma maneira apagaria do ecrã as empresas que ainda valia a pena
+   investigar — e, sem fornecedor, apagá-las-ia a todas. */
+const STATUS_CRITERIO = { CUMPRE: 'CUMPRE', NAO_CUMPRE: 'NAO_CUMPRE', DESCONHECIDO: 'DESCONHECIDO' };
+const MODOS_EMPRESA = ['ESTRITO', 'INTELIGENTE', 'EXPLORATORIO'];
+const MATCH_ROTULO_EMPRESA = {
+  FORTE: 'Match forte', PARCIAL: 'Match parcial',
+  INCONCLUSIVO: 'Inconclusivo', NAO_CUMPRE: 'Não cumpre'
+};
+
+function temValorEmpresa(env) {
+  return Boolean(env && ESTADOS_EMPRESA_COM_VALOR.includes(env.estado) && env.valor != null);
+}
+
+function avaliarCriterioNumerico(env, minimo, qualidade) {
+  if (minimo == null || minimo === '') return STATUS_CRITERIO.CUMPRE;
+  const min = Number(minimo);
+  if (!Number.isFinite(min)) return STATUS_CRITERIO.CUMPRE;
+  if (!temValorEmpresa(env)) return STATUS_CRITERIO.DESCONHECIDO;
+  const v = Number(env.valor);
+  if (!Number.isFinite(v)) return STATUS_CRITERIO.DESCONHECIDO;
+  /* o dado existe mas este nível de qualidade não o aceita: não se sabe
+     o suficiente para ESTE utilizador, logo desconhecido */
+  if (!estadosAceitesEmpresa(qualidade).includes(env.estado)) return STATUS_CRITERIO.DESCONHECIDO;
+  return v >= min ? STATUS_CRITERIO.CUMPRE : STATUS_CRITERIO.NAO_CUMPRE;
+}
+
+function avaliarCriterioTexto(env, procura, qualidade) {
+  const q = String(procura == null ? '' : procura).trim();
+  if (!q) return STATUS_CRITERIO.CUMPRE;
+  if (!temValorEmpresa(env)) return STATUS_CRITERIO.DESCONHECIDO;
+  if (!estadosAceitesEmpresa(qualidade).includes(env.estado)) return STATUS_CRITERIO.DESCONHECIDO;
+  return normalizeStr(String(env.valor)).includes(normalizeStr(q))
+    ? STATUS_CRITERIO.CUMPRE : STATUS_CRITERIO.NAO_CUMPRE;
+}
+
+function classificarMatch(status) {
+  const vs = Object.values(status || {});
+  if (!vs.length) return 'FORTE';
+  if (vs.includes(STATUS_CRITERIO.NAO_CUMPRE)) return 'NAO_CUMPRE';
+  if (vs.every(v => v === STATUS_CRITERIO.CUMPRE)) return 'FORTE';
+  if (vs.some(v => v === STATUS_CRITERIO.CUMPRE)) return 'PARCIAL';
+  return 'INCONCLUSIVO';
+}
+
+/* Devolve sempre o estado de cada critério, mesmo quando não passa: é
+   isso que permite ao ecrã dizer "faturação: informação não encontrada"
+   em vez de deixar o utilizador a supor que foi verificada. */
+function avaliarEmpresa(empresa, f) {
+  const modo = (f && MODOS_EMPRESA.includes(f.modoCorrespondencia)) ? f.modoCorrespondencia : 'INTELIGENTE';
+  if (!temCriterioEmpresa(f)) {
+    return { passa: true, status: {}, match: 'FORTE', modo, confirmados: 0, desconhecidos: 0, naoCumpre: 0, total: 0, forca: 0 };
+  }
+  const q = (f && f.qualidadeDados) || 'CONFIRMADO_ESTIMADO';
+  const e = empresa || {};
+  const status = {};
+  const pares = [['funcionarios', f.minFuncionarios], ['faturacaoAnual', f.minFaturacaoAnual], ['capitalSocial', f.minCapitalSocial]];
+  for (const [campo, minimo] of pares) {
+    if (minimo == null) continue;
+    status[campo] = avaliarCriterioNumerico(e[campo], minimo, q);
+  }
+  const cae = String((f && f.caeQuery) || '').trim();
+  if (cae) status.cae = avaliarCriterioTexto(e.cae, cae, q);
+  /* Sem dado jurídico no modelo, o critério fica DESCONHECIDO — que é a
+     verdade — em vez de excluir toda a gente como se soubéssemos. */
+  if (String((f && f.estadoEmpresa) || '').trim()) status.estadoEmpresa = STATUS_CRITERIO.DESCONHECIDO;
+
+  const vs = Object.values(status);
+  const confirmados = vs.filter(v => v === STATUS_CRITERIO.CUMPRE).length;
+  const desconhecidos = vs.filter(v => v === STATUS_CRITERIO.DESCONHECIDO).length;
+  const naoCumpre = vs.filter(v => v === STATUS_CRITERIO.NAO_CUMPRE).length;
+
+  let passa;
+  if (modo === 'ESTRITO') passa = vs.length > 0 && vs.every(v => v === STATUS_CRITERIO.CUMPRE);
+  else if (modo === 'EXPLORATORIO') passa = true;
+  else passa = naoCumpre === 0;   /* INTELIGENTE: só sai quem comprovadamente falha */
+
+  return { passa, status, match: classificarMatch(status), modo,
+           confirmados, desconhecidos, naoCumpre, total: vs.length,
+           forca: confirmados * 10 - desconhecidos };
+}
+
+/* Reservado para fase futura. Null enquanto não houver dados: um número
+   entre 0 e 100 tirado de campos vazios seria falsa precisão. */
+function scorePorte(empresa) {
+  const e = empresa || {};
+  const comValor = ['funcionarios', 'faturacaoAnual', 'capitalSocial']
+    .filter(c => e[c] && e[c].valor != null && (e[c].estado === 'CONFIRMADO' || e[c].estado === 'ESTIMADO'));
+  if (comValor.length < 2) return null;
+  return null;
 }
 
 /* API de depuração/manutenção exposta no browser */
 window.LeadMapPro = { state, CONFIG, NICHES, DataCleaner, Validator, runSearch, buildWorkbook, leadsToRows, MapProviders, PlacesProviders,
   socials: { enrichLeadSocials, startSocialEnrichment, getSocials, emptySocials, socialStatus, socialEnrichmentCache, socialEnrichmentInFlight, SOCIAL_CONCURRENCY },
   emails: { enrichLeadEmail, startEmailEnrichment, getEmails, emailStatus, emailEnrichmentCache, emailEnrichmentInFlight, EMAIL_CONCURRENCY },
-  empresa: { semDadosEmpresa, getEmpresa, rotuloEmpresa, CAMPOS_EMPRESA } };
+  empresa: { semDadosEmpresa, getEmpresa, rotuloEmpresa, CAMPOS_EMPRESA,
+    cumpreMinimoEmpresa, cumpreTextoEmpresa, avaliarEmpresa, temCriterioEmpresa,
+    filtrosEmpresaVazios, scorePorte, lerFiltrosEmpresa, resumoFiltrosEmpresa,
+    avaliarCriterioNumerico, avaliarCriterioTexto, classificarMatch,
+    STATUS_CRITERIO, MODOS_EMPRESA, evidenciasDeEmpresa } };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
