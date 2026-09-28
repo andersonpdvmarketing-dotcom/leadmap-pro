@@ -4099,11 +4099,6 @@ function renderAll(opts) {
 }
 
 /* ---------- 11. Exportação (XLSX com fallback CSV) ---------- */
-/* Numa folha de cálculo uma célula vazia filtra, ordena e soma bem;
-   "N/D" é texto que suja tudo isso. O ND continua a ser a convenção do
-   ecrã — muda só o que sai no ficheiro. */
-const celula = v => (v == null || v === ND || v === '') ? '' : v;
-
 /* O @ do Instagram, extraído do URL e só quando o URL é mesmo de um
    perfil. Um link para /p/, /reel/ ou /explore/ aponta para uma
    publicação, não para uma conta: nesses casos fica vazio, porque
@@ -4152,77 +4147,299 @@ function idsDaFonte(l) {
  * Não lê `state`: o ficheiro tem de representar a lista que lhe deram,
  * não a pesquisa aberta no ecrã. O id da geração entra por `opts`.
  */
-function leadsToRows(list, opts = {}) {
-  const idPesquisaFallback = opts.searchId || '';
-  return list.map(l => {
-    const s = getSocials(l);
-    const ig = s.instagram.found ? s.instagram.url : celula(l.instagram);
-    const fonteIds = idsDaFonte(l);
-    const emails = Array.isArray(l.emails) ? l.emails.map(e => e && e.email).filter(Boolean) : [];
-    /* País: só sai se vier explícito nos dados.
-       Ter concelho ou distrito NÃO é prova de país. O modo Portugal usa
-       uma bounding box, não a fronteira política, e o próprio código
-       reconhece que "as zonas de fronteira apanham empresas espanholas";
-       o filtro que as exclui é condicional, corre só no modo nacional e
-       não fica registado no lead. Inferir daí seria adivinhar.
-       Hoje nenhuma fonte preenche este campo, por isso a coluna sai
-       vazia — e passa a preencher-se sozinha no dia em que o modelo
-       ganhar um país a sério. */
-    const pais = [l.pais, l.country].find(v => typeof v === 'string' && v.trim() && v !== ND);
-    return {
-      'Empresa / Profissional': celula(l.nome),
-      'Atividade': celula(nichoLabel(l)),
-      'Segmento': celula(l.segmento),
-      'Tipo de lead': l.leadType === 'BUSINESS' ? 'Empresa' : '',
-      'Morada': celula(l.morada),
-      'Código Postal': celula(l.codigoPostal),
-      'Localidade': celula(l.localidade),
-      'Concelho': celula(l.concelho),
-      'Distrito': celula(l.distrito),
-      'País': pais ? pais.trim() : '',
-      'Telefone': celula(l.telefone),
-      'Telemóvel': celula(l.telemovel),
-      'Email': emails.join('; '),
-      'Website': celula(l.website),
-      'Instagram': ig,
-      'Instagram @': instagramUsername(ig),
-      'Facebook': s.facebook.found ? s.facebook.url : celula(l.facebook),
-      'LinkedIn': s.linkedin.found ? s.linkedin.url : celula(l.linkedin),
-      'TikTok': s.tiktok.found ? s.tiktok.url : '',
-      'YouTube': s.youtube.found ? s.youtube.url : '',
-      'Latitude': l.lat,
-      'Longitude': l.lon,
-      'Distância (km)': l.distanciaKm,
-      'Fonte': celula(fonteLabel(l)),
-      'Place ID': fonteIds.placeId,
-      'OSM ID': fonteIds.osmId,
-      'Google Maps': fonteIds.maps,
-      'Pesquisa': (l.searchQueries && l.searchQueries.length) ? l.searchQueries.join('; ') : '',
-      'Lead já capturada': l.historico ? (l.historico.estado === 'JA_CAPTURADA' ? 'SIM' : 'NÃO') : '',
-      'Número de capturas': l.historico ? (Number(l.historico.captureCount) || 1) : '',
-      'Primeira captura': (l.historico && l.historico.firstCapturedAt) ? celula(fmtDataHora(l.historico.firstCapturedAt)) : '',
-      'ID da pesquisa': (l.historico && l.historico.firstSearchId) ? l.historico.firstSearchId : idPesquisaFallback,
-      'Data da Pesquisa': celula(l.dataPesquisa)
-    };
-  });
+/* =====================================================================
+   EXPORTAÇÃO — camada explícita
+   ---------------------------------------------------------------------
+   Um schema escrito à mão, não `Object.keys(lead)`. A diferença importa:
+   percorrer as chaves do objeto faria as colunas mudarem sozinhas sempre
+   que alguém acrescentasse um campo interno, e um dia exportaria algo
+   que não devia sair.
+
+   A regra que governa tudo o resto: o ficheiro representa o ESTADO REAL
+   do lead. Um dado que não existe fica em célula vazia — mas a coluna de
+   estado ao lado continua a dizer porquê. Vazio não é zero, e "não
+   consultado" não é "não encontrado".
+   ===================================================================== */
+
+/* Vazio em vez de "N/D": numa folha de cálculo a célula vazia filtra,
+   ordena e soma bem; "N/D" é texto que suja tudo isso. */
+const celula = v => (v == null || v === ND || v === '') ? '' : v;
+
+/**
+ * Protege contra injeção de fórmulas.
+ *
+ * Uma célula que comece por `=` é executada pelo Excel. O nome de uma
+ * empresa vem de fontes públicas que não controlamos, e um nome como
+ * `=HYPERLINK(...)` transformaria um ficheiro de leads num vetor de
+ * ataque contra quem o abre.
+ *
+ * O prefixo só entra quando o valor parece mesmo uma fórmula: um
+ * telefone `+351 253 …` e um número negativo `-5` continuam intactos,
+ * porque a seguir ao sinal vem um dígito, não uma função.
+ */
+function seguroParaFolha(v) {
+  if (typeof v !== 'string' || !v) return v;
+  if (v[0] === '=' || /^[+\-@][A-Za-z(]/.test(v)) return "'" + v;
+  return v;
 }
-/* Larguras por coluna, na mesma ordem das chaves de leadsToRows. */
-const LARGURAS_XLSX = [
-  34, 18, 24, 13,           /* empresa · atividade · segmento · tipo */
-  32, 12, 17, 18, 16, 11,   /* morada · CP · localidade · concelho · distrito · país */
-  17, 17, 34, 32,           /* telefone · telemóvel · email · website */
-  30, 20, 30, 30, 30, 30,   /* instagram · @ · facebook · linkedin · tiktok · youtube */
-  11, 11, 13, 26,           /* lat · lon · distância · fonte */
-  30, 18, 46,               /* place id · osm id · maps */
-  24, 16, 17, 18, 20, 17    /* pesquisa · capturada · nº · 1ª captura · id · data */
-];
+
+/** Data consistente em todo o ficheiro: DD/MM/AAAA HH:mm. */
+function dataExport(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() +
+    ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+/** Número mesmo, para o Excel poder somar e ordenar. Nunca NaN. */
+function numeroExport(v) {
+  if (v == null || v === '') return '';
+  const n = Number(v);
+  return Number.isFinite(n) ? n : '';
+}
+
+const ROTULO_ESTADO_EMPRESA = {
+  CONFIRMADO: 'CONFIRMADO', ESTIMADO: 'ESTIMADO', CONFLITO: 'CONFLITO',
+  NAO_ENCONTRADO: 'NAO_ENCONTRADO', NAO_CONSULTADO: 'NAO_CONSULTADO'
+};
+
+/**
+ * As oito colunas de um campo empresarial.
+ *
+ * O valor sozinho não chega: um capital social de um milhão lido do site
+ * da empresa e um estimado por um agregador são coisas diferentes, e
+ * quem abre o Excel tem de conseguir distingui-las sem perguntar a
+ * ninguém. Daí estado, fonte, URL, data, confiança e tipo — e a
+ * contagem de evidências, que denuncia um conflito à vista.
+ */
+function colunasCampoEmpresa(env, rot, numerico) {
+  const e = env || {};
+  const evs = evidenciasDeEmpresa(e);
+  const principal = evs.length ? evs[0] : null;
+  const temValor = e.valor != null;
+  const o = {};
+  o[rot] = temValor ? (numerico ? numeroExport(e.valor) : seguroParaFolha(String(e.valor))) : '';
+  o[rot + ' — Estado'] = ROTULO_ESTADO_EMPRESA[e.estado] || '';
+  o[rot + ' — Fonte'] = temValor ? celula(e.fonte) : '';
+  o[rot + ' — URL'] = principal && principal.url ? principal.url : '';
+  o[rot + ' — Consultado em'] = temValor ? dataExport(e.consultadoEm) : '';
+  o[rot + ' — Confiança'] = (temValor && typeof e.confianca === 'number')
+    ? Math.round(e.confianca * 100) : '';
+  o[rot + ' — Tipo de fonte'] = principal && principal.tipoFonte ? principal.tipoFonte : '';
+  o[rot + ' — Nº evidências'] = evs.length;
+  return o;
+}
+
+/**
+ * Todas as evidências, em texto que uma pessoa lê.
+ *
+ * `[object Object]` numa célula é o mesmo que não exportar nada. E um
+ * conflito só é auditável se as duas afirmações estiverem lá: ver
+ * "51 | Fornecedor comercial" ao lado de "42 | Diretório" é o que
+ * permite a quem decide escolher em qual acredita.
+ */
+function evidenciasLegiveis(emp) {
+  const ROT = { nif: 'NIF', cae: 'CAE', funcionarios: 'Funcionários',
+                faturacaoAnual: 'Faturação', capitalSocial: 'Capital' };
+  const linhas = [];
+  for (const c of CAMPOS_EMPRESA) {
+    for (const ev of evidenciasDeEmpresa(emp[c])) {
+      linhas.push(ROT[c] + ': ' + ev.valor +
+        ' | ' + (ev.fonte || '—') +
+        ' | ' + (ev.tipoFonte || '—') +
+        ' | ' + (typeof ev.confianca === 'number' ? Math.round(ev.confianca * 100) + '%' : '—') +
+        ' | ' + (dataExport(ev.consultadoEm) || '—') +
+        (ev.url ? ' | ' + ev.url : ''));
+    }
+  }
+  return linhas.join('  ||  ');
+}
+
+/** O mesmo, para quem quiser processar por máquina. */
+function evidenciasJson(emp) {
+  const out = {};
+  for (const c of CAMPOS_EMPRESA) {
+    const evs = evidenciasDeEmpresa(emp[c]);
+    if (evs.length) out[c] = evs.map(ev => ({
+      valor: ev.valor, fonte: ev.fonte, url: ev.url || null,
+      consultadoEm: ev.consultadoEm, confianca: ev.confianca,
+      estado: ev.estado, tipoFonte: ev.tipoFonte
+    }));
+  }
+  return Object.keys(out).length ? JSON.stringify(out) : '';
+}
+
+const ROT_CRITERIO = { funcionarios: 'Funcionários', faturacaoAnual: 'Faturação',
+                       capitalSocial: 'Capital', cae: 'CAE', estadoEmpresa: 'Estado' };
+
+/** Descrição legível dos critérios pedidos: "Funcionários >= 30 | …". */
+function criteriosAtivosTexto(f) {
+  if (!f) return '';
+  const p = [];
+  if (f.minFuncionarios != null) p.push('Funcionários >= ' + f.minFuncionarios);
+  if (f.minFaturacaoAnual != null) p.push('Faturação >= ' + f.minFaturacaoAnual);
+  if (f.minCapitalSocial != null) p.push('Capital >= ' + f.minCapitalSocial);
+  if (String(f.caeQuery || '').trim()) p.push('CAE ~ ' + f.caeQuery);
+  if (String(f.estadoEmpresa || '').trim()) p.push('Estado = ' + f.estadoEmpresa);
+  return p.join(' | ');
+}
+
+function criteriosPorEstado(avaliacao, alvo) {
+  if (!avaliacao || !avaliacao.status) return '';
+  return Object.entries(avaliacao.status)
+    .filter(([, v]) => v === alvo)
+    .map(([k]) => ROT_CRITERIO[k] || k)
+    .join(' | ');
+}
+
+/**
+ * Uma linha de exportação. Ponto único — XLSX e CSV usam esta.
+ *
+ * As 33 colunas originais vêm primeiro e inalteradas, para não partir
+ * quem já consome o ficheiro. Tudo o que é novo vem a seguir, em blocos.
+ */
+function leadToExportRow(l, contexto = {}) {
+  const s = getSocials(l);
+  const emp = getEmpresa(l);
+  const ig = s.instagram.found ? s.instagram.url : celula(l.instagram);
+  const fonteIds = idsDaFonte(l);
+  const emails = Array.isArray(l.emails) ? l.emails.map(e => e && e.email).filter(Boolean) : [];
+  const temPT = (l.concelho && l.concelho !== ND) || (l.distrito && l.distrito !== ND);
+  const pais = [l.pais, l.country].find(v => typeof v === 'string' && v.trim() && v !== ND);
+  const a = contexto.avaliacao || null;
+  const f = contexto.filtros || null;
+  const investigacao = contexto.estadoInvestigacao || '';
+
+  return {
+    /* ---- as 33 originais, exatamente como sempre foram ---- */
+    'Empresa / Profissional': seguroParaFolha(celula(l.nome)),
+    'Atividade': seguroParaFolha(celula(nichoLabel(l))),
+    'Segmento': seguroParaFolha(celula(l.segmento)),
+    'Tipo de lead': l.leadType === 'BUSINESS' ? 'Empresa' : '',
+    'Morada': seguroParaFolha(celula(l.morada)),
+    'Código Postal': celula(l.codigoPostal),
+    'Localidade': seguroParaFolha(celula(l.localidade)),
+    'Concelho': seguroParaFolha(celula(l.concelho)),
+    'Distrito': seguroParaFolha(celula(l.distrito)),
+    'País': pais ? pais.trim() : (temPT ? '' : ''),
+    'Telefone': celula(l.telefone),
+    'Telemóvel': celula(l.telemovel),
+    'Email': emails.join('; '),
+    'Website': celula(l.website),
+    'Instagram': ig,
+    'Instagram @': instagramUsername(ig),
+    'Facebook': s.facebook.found ? s.facebook.url : celula(l.facebook),
+    'LinkedIn': s.linkedin.found ? s.linkedin.url : celula(l.linkedin),
+    'TikTok': s.tiktok.found ? s.tiktok.url : '',
+    'YouTube': s.youtube.found ? s.youtube.url : '',
+    'Latitude': numeroExport(l.lat),
+    'Longitude': numeroExport(l.lon),
+    'Distância (km)': numeroExport(l.distanciaKm),
+    'Fonte': celula(fonteLabel(l)),
+    'Place ID': fonteIds.placeId,
+    'OSM ID': fonteIds.osmId,
+    'Google Maps': fonteIds.maps,
+    'Pesquisa': (l.searchQueries && l.searchQueries.length) ? seguroParaFolha(l.searchQueries.join('; ')) : '',
+    'Lead já capturada': l.historico ? (l.historico.estado === 'JA_CAPTURADA' ? 'SIM' : 'NÃO') : '',
+    'Número de capturas': l.historico ? numeroExport(l.historico.captureCount || 1) : '',
+    'Primeira captura': (l.historico && l.historico.firstCapturedAt) ? dataExport(l.historico.firstCapturedAt) : '',
+    'ID da pesquisa': (l.historico && l.historico.firstSearchId) ? l.historico.firstSearchId : (contexto.searchId || ''),
+    'Data da Pesquisa': celula(l.dataPesquisa),
+
+    /* ---- BLOCO: inteligência empresarial ---- */
+    ...colunasCampoEmpresa(emp.nif, 'NIF / NIPC', false),
+    ...colunasCampoEmpresa(emp.cae, 'CAE', false),
+    ...colunasCampoEmpresa(emp.capitalSocial, 'Capital social (€)', true),
+    ...colunasCampoEmpresa(emp.funcionarios, 'Funcionários', true),
+    ...colunasCampoEmpresa(emp.faturacaoAnual, 'Faturação anual (€)', true),
+
+    /* ---- BLOCO: qualificação ---- */
+    'Match empresarial': a && a.total ? a.match : '',
+    'Modo de correspondência': a && a.total ? a.modo : '',
+    'Critérios ativos': criteriosAtivosTexto(f),
+    'Critérios cumpridos': criteriosPorEstado(a, 'CUMPRE'),
+    'Critérios não cumpridos': criteriosPorEstado(a, 'NAO_CUMPRE'),
+    'Critérios desconhecidos': criteriosPorEstado(a, 'DESCONHECIDO'),
+    'Nº critérios confirmados': a && a.total ? a.confirmados : '',
+    'Nº critérios total': a && a.total ? a.total : '',
+    'Tem conflito': CAMPOS_EMPRESA.some(c => emp[c].estado === 'CONFLITO') ? 'SIM' : 'NÃO',
+    'Nº campos em conflito': CAMPOS_EMPRESA.filter(c => emp[c].estado === 'CONFLITO').length,
+    'Estado da investigação': investigacao,
+
+    /* ---- BLOCO: auditoria ---- */
+    'Evidências empresariais': evidenciasLegiveis(emp),
+    'Evidências JSON': evidenciasJson(emp),
+
+    /* ---- BLOCO: metadados ---- */
+    'ID do lead': celula(l.id),
+    'Nicho (chave)': celula(l.nicho),
+    'Fontes de descoberta': Array.isArray(l.fontes) && l.fontes.length ? l.fontes.join(' | ') : '',
+    'Emails encontrados': emails.length,
+    'Redes sociais encontradas': SOCIAL_NETS.filter(r => s[r].found).length
+  };
+}
+
+/**
+ * Linhas de exportação. Delegação pura: o schema vive em
+ * `leadToExportRow`, para não haver duas versões da verdade.
+ */
+function leadsToRows(list, opts = {}) {
+  /* Nada daqui vem do ecrã. Quem exporta a pesquisa aberta passa
+     `state.filters`; quem descarrega uma lista guardada passa `null` — e
+     tem de ficar `null`, senão o ficheiro de uma lista de ontem sairia
+     rotulado com os critérios da pesquisa que está aberta agora. */
+  const contextoBase = {
+    searchId: opts.searchId || '',
+    filtros: opts.filtros || null
+  };
+  return list.map(l => leadToExportRow(l, {
+    ...contextoBase,
+    avaliacao: opts.avaliacoes ? opts.avaliacoes.get(l.id) : null,
+    estadoInvestigacao: opts.estados ? (opts.estados(l.id) || '') : ''
+  }));
+}
+
+/**
+ * Largura de cada coluna, derivada do próprio cabeçalho.
+ *
+ * A versão anterior era uma lista escrita à mão, e uma coluna nova no
+ * meio desalinhava todas as seguintes em silêncio. Aqui a largura é uma
+ * função do nome, por isso não há nada para dessincronizar.
+ */
+function larguraDaColuna(nome) {
+  if (/Evidências/.test(nome)) return 60;
+  if (/URL|Google Maps|Website|Instagram$|Facebook|LinkedIn|TikTok|YouTube/.test(nome)) return 34;
+  if (/Critérios|Empresa \/ Profissional|Morada/.test(nome)) return 32;
+  if (/— (Estado|Tipo de fonte)/.test(nome)) return 17;
+  if (/— (Confiança|Nº evidências)/.test(nome)) return 13;
+  if (/^(Latitude|Longitude|Distância)/.test(nome)) return 11;
+  return Math.min(30, Math.max(12, nome.length + 3));
+}
+
 function buildWorkbook(list, opts = {}) {
-  const ws = XLSX.utils.json_to_sheet(leadsToRows(list, opts));
-  ws['!cols'] = LARGURAS_XLSX.map(wch => ({ wch }));
+  const linhas = leadsToRows(list, opts);
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  const cabecalhos = linhas.length ? Object.keys(linhas[0]) : [];
+  ws['!cols'] = cabecalhos.map(n => ({ wch: larguraDaColuna(n) }));
+  /* Filtro automático: com noventa e tantas colunas, sem ele o ficheiro é
+     impraticável.
+
+     Aqui não se congela a primeira linha. Não é esquecimento: a build
+     community do SheetJS (0.20.3, a do CDN) ignora `!freeze` em qualquer
+     das grafias — verificado a desmontar o .xlsx gerado, onde nunca
+     aparece um `<pane>`. Escrever a linha daria a impressão de que o
+     ficheiro sai congelado quando não sai. */
+  if (cabecalhos.length && linhas.length) {
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({
+      s: { r: 0, c: 0 }, e: { r: linhas.length, c: cabecalhos.length - 1 } }) };
+  }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leads');
   return wb;
 }
+
 function ensureXlsx() {
   if (window.XLSX) return Promise.resolve(true);
   /* fallback de CDN (unpkg) se o cdn.sheetjs.com falhar */
@@ -4250,7 +4467,14 @@ function exportCsv(list, opts = {}) {
 async function exportLeads(list, origem) {
   if (!list.length) { toast('Não há leads para exportar.', 'warn'); return; }
   const ok = await ensureXlsx();
-  const opts = { searchId: state.searchId || '' };
+  /* o contexto leva o que o schema precisa e o lead não tem: a avaliação
+     de porte, os critérios pedidos e o estado da investigação */
+  const opts = {
+    searchId: state.searchId || '',
+    filtros: state.filters,
+    avaliacoes: state.avaliacaoPorte,
+    estados: (id) => estadoEmpresaLead(id)
+  };
   if (ok) {
     XLSX.writeFile(buildWorkbook(list, opts), 'leadmap-pro_' + todayStamp() + '.xlsx');
     toast(list.length + ' leads exportados para Excel (' + origem + ').', 'success');
@@ -7918,7 +8142,9 @@ async function baixarLista(meta) {
     await ensureXlsx();
     /* o id vem da própria geração, nunca de state: o ficheiro representa
        a lista escolhida, não a pesquisa aberta no ecrã */
-    const wb = buildWorkbook(leads, { searchId: meta.searchId || meta.historyId || meta.id || '' });
+    /* um snapshot não traz avaliação de porte nem investigação em curso:
+       as colunas de qualificação saem vazias, que é a verdade */
+    const wb = buildWorkbook(leads, { searchId: meta.searchId || meta.historyId || meta.id || '', filtros: null });
     const nome = meta.nome.replace(/[\\/:*?"<>|]/g, '-').slice(0, 80);
     XLSX.writeFile(wb, nome + '.xlsx');
     toast(leads.length + ' leads exportadas de "' + meta.nome + '".', 'success');

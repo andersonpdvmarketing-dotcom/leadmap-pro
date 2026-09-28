@@ -28,6 +28,13 @@ const HTML = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
  * Extrair as funções reais do index.html                            *
  * ---------------------------------------------------------------- */
 
+/* Estes guardas leem código, não prosa: um comentário que explique
+   porque é que NÃO se lê o `state` não pode fazer falhar o teste que
+   verifica que não se lê o `state`. */
+function semComentarios(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+}
+
 function extrair(nome, ate) {
   const i = HTML.indexOf(nome);
   assert.ok(i > 0, 'não encontrei ' + nome + ' no index.html');
@@ -52,7 +59,15 @@ const FONTE = [
   'function fmtDataHora(iso) { return iso ? String(iso) : ND; }',
   'const SOCIAL_NETS = ["instagram", "facebook", "tiktok", "youtube", "linkedin"];',
   extrair('function emptySocials()', 'const socialEnrichmentCache'),
-  extrair('const celula =', 'function buildWorkbook'),
+  /* O bloco empresarial da exportação tem testes próprios em
+     export-empresarial.test.mjs. Aqui basta existir, para as 33
+     colunas originais serem exercidas com um lead sem empresa. */
+  'const CAMPOS_EMPRESA = ["nif","cae","capitalSocial","funcionarios","faturacaoAnual"];',
+  'function evidenciasDeEmpresa(c) { return (c && Array.isArray(c.evidencias)) ? c.evidencias : []; }',
+  'function getEmpresa() { const o = {}; for (const c of CAMPOS_EMPRESA)',
+  '  o[c] = { valor: null, fonte: null, consultadoEm: null, confianca: null, estado: "NAO_CONSULTADO" };',
+  '  return o; }',
+  extrair('function instagramUsername(url)', 'function buildWorkbook'),
   'return { leadsToRows, instagramUsername, idsDaFonte, celula };'
 ].join('\n');
 
@@ -168,7 +183,12 @@ test('E: lead sem redes continua a produzir uma linha válida', () => {
   assert.equal(r['Empresa / Profissional'], 'Padaria Açúcar & Canela, Lda');
   assert.equal(r['Instagram'], '');
   assert.equal(r['Telemóvel'], '', 'N/D devia virar vazio');
-  assert.equal(Object.keys(r).length, 33);
+  /* O schema cresceu com o bloco empresarial. As 33 originais continuam
+     a ser as 33 primeiras — a ordem exata está fixada nos testes de
+     export-empresarial.test.mjs. */
+  assert.ok(Object.keys(r).length >= 33);
+  for (const c of ['Empresa / Profissional', 'Email', 'TikTok', 'Data da Pesquisa'])
+    assert.ok(Object.keys(r).indexOf(c) < 33, c + ' saiu do bloco original');
 });
 
 /* ================================================================ *
@@ -176,7 +196,7 @@ test('E: lead sem redes continua a produzir uma linha válida', () => {
  * ================================================================ */
 
 test('F: leadsToRows não lê state — o ficheiro não depende da pesquisa aberta', () => {
-  const corpo = extrair('function leadsToRows', 'const LARGURAS_XLSX');
+  const corpo = semComentarios(extrair('function leadToExportRow', 'function larguraDaColuna'));
   assert.equal(/\bstate\./.test(corpo), false, 'leadsToRows voltou a ler state');
 });
 
@@ -201,7 +221,7 @@ test('G: o download é puro — nenhuma chamada externa no caminho de exportaç�
 });
 
 test('G: leadsToRows não contacta nada', () => {
-  const corpo = extrair('function leadsToRows', 'const LARGURAS_XLSX');
+  const corpo = semComentarios(extrair('function leadToExportRow', 'function larguraDaColuna'));
   for (const proibido of ['fetch(', 'XMLHttpRequest', 'import(']) {
     assert.equal(corpo.includes(proibido), false);
   }
