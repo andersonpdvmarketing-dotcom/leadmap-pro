@@ -25,6 +25,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { CAMPOS, ESTADO_DADO, TIPO_FONTE } from '../providers/company/contract.mjs';
+import { IDENTIDADE, SINAL } from '../providers/company/identidade.mjs';
 
 const HTML = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
@@ -66,10 +67,24 @@ const FONTE = [
   '  for (const r of ["instagram","facebook","linkedin"]) if (!out[r].found && l[r] && l[r] !== ND)',
   '    out[r] = { url: l[r], found: true, source: "fonte" }; return out; }',
   'function envelopeEmpresaVazio() { return { valor:null, fonte:null, consultadoEm:null, confianca:null, estado:"NAO_CONSULTADO" }; }',
-  'function semDadosEmpresa() { const o = {}; for (const c of CAMPOS_EMPRESA) o[c] = envelopeEmpresaVazio(); return o; }',
+  'function semDadosEmpresa() { const o = {}; for (const c of CAMPOS_EMPRESA) o[c] = envelopeEmpresaVazio();',
+  '  o.identidade = identidadeEmpresaVazia(); return o; }',
   'function evidenciasDeEmpresa(campo) { return (campo && Array.isArray(campo.evidencias)) ? campo.evidencias : []; }',
+  /* identidade empresarial (Fase 3.2) — o espelho define estes no bloco
+     do modelo, fora da fatia que se extrai aqui */
+  'const IDENTIDADES_EMPRESA = ' + JSON.stringify(Object.keys(IDENTIDADE)) + ';',
+  'const SINAIS_POSITIVOS_EMPRESA = ["NOME_EXATO","NOME_NORMALIZADO","TOKEN_DISTINTIVO",',
+  '  "FIRMA_NO_SITE","DOMINIO_COMPATIVEL","NIF_CONTEXTUAL","CONTEXTO_LEGAL"];',
+  'function identidadeEmpresaVazia() { return { estado:"NAO_VERIFICADA", confianca:null, nif:null,',
+  '  nomeLead:null, firmaOficial:null, dominio:null, sinais:[], conflitos:[], candidatos:[],',
+  '  derivadosNaoAtribuidos:[], validadoEm:null }; }',
   'function getEmpresa(l) { const base = semDadosEmpresa(); const e = l && l.empresa;',
   '  if (!e || typeof e !== "object") return base;',
+  '  const i = e.identidade;',
+  '  if (i && typeof i === "object" && IDENTIDADES_EMPRESA.includes(i.estado))',
+  '    base.identidade = Object.assign(identidadeEmpresaVazia(), i, { sinais: i.sinais || [],',
+  '      conflitos: i.conflitos || [], candidatos: i.candidatos || [],',
+  '      derivadosNaoAtribuidos: i.derivadosNaoAtribuidos || [] });',
   '  for (const c of CAMPOS_EMPRESA) { const v = e[c]; if (!v || typeof v !== "object") continue;',
   '    if (!ESTADOS_EMPRESA.includes(v.estado)) continue;',
   '    const cv = ESTADOS_EMPRESA_COM_VALOR.includes(v.estado); if (cv && v.valor == null) continue;',
@@ -81,7 +96,8 @@ const FONTE = [
   /* o código real da exportação */
   fatia('/* O @ do Instagram, extraído do URL', 'function leadsToRows'),
   fatia('function larguraDaColuna(nome)', 'function buildWorkbook'),
-  'return { leadToExportRow, seguroParaFolha, dataExport, numeroExport, evidenciasLegiveis,',
+  'return { leadToExportRow, seguroParaFolha, dataExport, numeroExport, evidenciasLegiveis,'
+  + ' sinaisIdentidadeTexto, derivadosBloqueadosTexto,',
   '  evidenciasJson, criteriosAtivosTexto, larguraDaColuna, celula };'
 ].join('\n');
 
@@ -95,6 +111,7 @@ const AGORA = '2026-09-28T23:57:00.000Z';
 const vaziosSoc = () => ({ instagram:{url:null,found:false,source:null}, facebook:{url:null,found:false,source:null},
   tiktok:{url:null,found:false,source:null}, youtube:{url:null,found:false,source:null}, linkedin:{url:null,found:false,source:null} });
 const semEmp = () => { const o = {}; for (const c of CAMPOS) o[c] = { valor:null, fonte:null, consultadoEm:null, confianca:null, estado:'NAO_CONSULTADO' }; return o; };
+const comIdent = (ident) => ({ ...semEmp(), identidade: ident });
 
 const ev = (valor, fonte, tipoFonte, url, estado = 'CONFIRMADO', confianca = 0.9) =>
   ({ valor, fonte, url, consultadoEm: AGORA, confianca, estado, tipoFonte });
@@ -479,4 +496,116 @@ test('o schema é explícito, não Object.keys(lead)', () => {
   const src = semComentarios(fatia('function leadToExportRow(l, contexto = {})', 'function leadsToRows'));
   assert.equal(/Object\.keys\(l\)|Object\.entries\(l\)/.test(src), false,
     'percorrer as chaves do lead faria as colunas mudarem sozinhas e podia exportar campos internos');
+});
+
+/* ================================================================ *
+ * Identidade empresarial na exportação (Fase 3.2)                   *
+ * ================================================================ */
+
+const identReal = {
+  estado: IDENTIDADE.CONFLITO, confianca: 0, nif: '501135227',
+  nomeLead: 'Clínica Onda de Sorrisos', firmaOficial: 'J. J. LOURO PEREIRA, S.A.',
+  dominio: 'ondadesorrisos',
+  sinais: [{ sinal: SINAL.NIF_CONTEXTUAL, peso: 0.15, detalhe: 'NIPC' },
+           { sinal: SINAL.NOME_INCOMPATIVEL, peso: -0.45, detalhe: 'J. J. LOURO PEREIRA, S.A.' }],
+  conflitos: ['O registo diz "J. J. LOURO PEREIRA, S.A.", que não corresponde ao lead.'],
+  candidatos: [{ nif: '501135227', rotulo: 'NIPC', ocorrencias: 2 }],
+  derivadosNaoAtribuidos: [{ campo: 'cae', valor: '31004', fonte: 'SICAE',
+    url: 'http://www.sicae.pt/Consulta.aspx', motivo: 'CONFLITO' }],
+  validadoEm: AGORA
+};
+
+test('23: as 91 colunas anteriores continuam nas 91 primeiras posições', () => {
+  /* O bloco de identidade foi acrescentado ao FIM. Quem já consome este
+     ficheiro não pode ver nada mexer-se. */
+  const cab = Object.keys(linha(lead()));
+  assert.equal(cab.length, 97, 'colunas: ' + cab.length);
+  assert.deepEqual(cab.slice(0, 33), ORIGINAIS);
+  for (const c of ['NIF / NIPC', 'CAE — Estado', 'Capital social (€)', 'Match empresarial',
+                   'Evidências empresariais', 'Evidências JSON', 'Redes sociais encontradas']) {
+    assert.ok(cab.indexOf(c) < 91, c + ' saiu do bloco das 91');
+  }
+  assert.equal(cab[90], 'Redes sociais encontradas', 'a 91.ª coluna mudou');
+});
+
+test('24: as colunas de identidade existem e vêm no fim', () => {
+  const cab = Object.keys(linha(lead()));
+  assert.deepEqual(cab.slice(91), [
+    'Identidade empresarial — Estado',
+    'Identidade empresarial — Confiança',
+    'Firma oficial',
+    'Identidade — Sinais',
+    'Identidade — Conflitos',
+    'Identidade — Dados não atribuídos'
+  ]);
+});
+
+test('24: o caso real chega ao ficheiro com a firma e o motivo', () => {
+  const r = linha(lead({ empresa: comIdent(identReal) }));
+  assert.equal(r['Identidade empresarial — Estado'], 'CONFLITO');
+  assert.equal(r['Identidade empresarial — Confiança'], 0);
+  assert.equal(r['Firma oficial'], 'J. J. LOURO PEREIRA, S.A.');
+  assert.ok(r['Identidade — Conflitos'].includes('J. J. LOURO PEREIRA'));
+  const bloq = r['Identidade — Dados não atribuídos'];
+  assert.ok(bloq.includes('CAE 31004'), 'o dado recusado tem de ficar registado');
+  assert.ok(bloq.includes('identidade CONFLITO'), 'com o motivo');
+  assert.ok(bloq.includes('sicae.pt'), 'e com a URL, para se poder confirmar à mão');
+});
+
+test('24: os sinais saem com + e - à frente', () => {
+  const r = linha(lead({ empresa: comIdent(identReal) }));
+  const s = r['Identidade — Sinais'];
+  assert.ok(s.includes('+NIF_CONTEXTUAL'), s);
+  assert.ok(s.includes('-NOME_INCOMPATIVEL'),
+    'sem o sinal à frente, "firma não corresponde" lê-se como uma qualidade da empresa');
+});
+
+test('24: uma identidade confirmada não inventa conflitos nem bloqueios', () => {
+  const r = linha(lead({ empresa: comIdent({
+    ...identReal, estado: IDENTIDADE.CONFIRMADA, confianca: 1,
+    firmaOficial: 'MEDIBRACARA - CENTRO MÉDICO LDA',
+    sinais: [{ sinal: SINAL.NOME_EXATO, peso: 0.55, detalhe: 'MEDIBRACARA - CENTRO MÉDICO LDA' }],
+    conflitos: [], derivadosNaoAtribuidos: []
+  }) }));
+  assert.equal(r['Identidade empresarial — Estado'], 'CONFIRMADA');
+  assert.equal(r['Identidade empresarial — Confiança'], 100);
+  assert.equal(r['Identidade — Conflitos'], '');
+  assert.equal(r['Identidade — Dados não atribuídos'], '');
+  assert.equal(typeof r['Identidade empresarial — Confiança'], 'number');
+});
+
+test('24: lead sem NIF não afirma identidade nenhuma', () => {
+  const r = linha(lead());
+  for (const c of ['Identidade empresarial — Estado', 'Identidade empresarial — Confiança',
+                   'Firma oficial', 'Identidade — Sinais', 'Identidade — Conflitos',
+                   'Identidade — Dados não atribuídos']) {
+    assert.equal(r[c], '', c);
+  }
+});
+
+test('24: snapshot antigo — identidade vazia, sem [object Object]', () => {
+  const antigo = { id: 'google-velho', nome: 'Padaria Antiga',
+    empresa: { cae: env('86230', 'SICAE', 'CONFIRMADO') } };
+  const r = linha(antigo);
+  assert.equal(r['Identidade empresarial — Estado'], '', 'sem NIF não se afirma estado');
+  assert.equal(r['CAE'], '86230', 'o dado antigo não se apaga');
+  for (const [k, v] of Object.entries(r)) {
+    assert.notEqual(String(v), '[object Object]', k);
+    assert.notEqual(String(v), 'undefined', k);
+  }
+});
+
+test('24: uma firma maliciosa é neutralizada como qualquer outro texto', () => {
+  const r = linha(lead({ empresa: comIdent({
+    ...identReal, firmaOficial: '=HYPERLINK("http://mau","x")' }) }));
+  assert.equal(r['Firma oficial'][0], "'");
+});
+
+test('24: as colunas de identidade não exportam nada de pessoal', () => {
+  const r = linha(lead({ empresa: comIdent(identReal) }));
+  const txt = [r['Identidade — Sinais'], r['Identidade — Conflitos'],
+               r['Identidade — Dados não atribuídos'], r['Firma oficial']].join(' ');
+  for (const p of ['residente', 'morada', 'gerente', 'sócio', 'socio', 'cartão de cidadão']) {
+    assert.equal(new RegExp(p, 'i').test(txt), false, p);
+  }
 });

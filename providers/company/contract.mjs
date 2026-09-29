@@ -232,8 +232,43 @@ export function naoEncontrado() {
 export function semDadosEmpresa() {
   const o = {};
   for (const c of CAMPOS) o[c] = envelopeVazio();
+  /* `identidade` é irmã dos campos, não um deles: não tem valor nem
+     estado de dado, responde a outra pergunta ("de quem é este NIF?") e
+     por isso fica fora de CAMPOS — que continua a ser a lista fechada
+     dos cinco campos de dados. */
+  o.identidade = identidadeVaziaLocal();
   return o;
 }
+
+/**
+ * A forma vazia da identidade.
+ *
+ * Vive aqui e não em `identidade.mjs` para não criar dependência
+ * circular: `identidade.mjs` importa CAMPOS deste ficheiro. A autoridade
+ * sobre estados e sinais continua a ser `identidade.mjs`; isto é só a
+ * forma de partida, e o teste de contrato segura as duas juntas.
+ */
+export function identidadeVaziaLocal() {
+  return {
+    estado: 'NAO_VERIFICADA',
+    confianca: null,
+    nif: null,
+    nomeLead: null,
+    firmaOficial: null,
+    firmaFonte: null,
+    dominio: null,
+    sinais: [],
+    conflitos: [],
+    candidatos: [],
+    derivadosNaoAtribuidos: [],
+    validadoEm: null
+  };
+}
+
+/** Estados válidos da identidade. Duplicado mínimo, coberto por teste. */
+export const IDENTIDADES_VALIDAS_CONTRATO = Object.freeze([
+  'CONFIRMADA', 'PROVAVEL', 'INCONCLUSIVA', 'CONFLITO', 'REJEITADA', 'NAO_VERIFICADA'
+]);
 
 /**
  * Leitura tolerante, para snapshots gravados antes de este campo existir.
@@ -262,6 +297,24 @@ export function lerEmpresa(lead) {
     /* as evidências são a razão de o conflito ser inspecionável: uma
        leitura que as deitasse fora tornaria o estado CONFLITO opaco */
     if (Array.isArray(v.evidencias) && v.evidencias.length) base[c].evidencias = v.evidencias;
+    /* de que NIF e de que identidade este dado depende — ver §18 da
+       missão: se o NIF cair, o que veio dele não pode continuar de pé */
+    if (v.dependeDe && typeof v.dependeDe === 'object') base[c].dependeDe = v.dependeDe;
+  }
+  /* Um snapshot gravado antes desta camada não tem identidade, e isso não
+     é o mesmo que ter sido verificada e falhado: fica NAO_VERIFICADA, e a
+     próxima investigação resolve-a. */
+  const i = e.identidade;
+  if (i && typeof i === 'object' && IDENTIDADES_VALIDAS_CONTRATO.includes(i.estado)) {
+    base.identidade = {
+      ...identidadeVaziaLocal(),
+      ...i,
+      sinais: Array.isArray(i.sinais) ? i.sinais : [],
+      conflitos: Array.isArray(i.conflitos) ? i.conflitos : [],
+      candidatos: Array.isArray(i.candidatos) ? i.candidatos : [],
+      derivadosNaoAtribuidos: Array.isArray(i.derivadosNaoAtribuidos)
+        ? i.derivadosNaoAtribuidos.filter(d => d && CAMPOS.includes(d.campo)) : []
+    };
   }
   return base;
 }
@@ -328,7 +381,15 @@ export function respostaConsulta({
   empresa = null,
   errorCode = null,
   errorMessage = null,
-  retryable = null
+  retryable = null,
+  /* A denominação oficial não é um dado de porte — é a resposta à
+     pergunta "de quem é este NIF?". Antes ficava presa dentro do
+     adapter: o SICAE lia-a e o contrato deitava-a fora, e sem ela a
+     camada de identidade não tinha com que trabalhar. O CAE de um
+     fabricante de móveis chegou a uma clínica dentária por causa
+     disto. */
+  denominacao = null,
+  caesSecundarios = null
 } = {}) {
   const dados = semDadosEmpresa();
   if (success && empresa && typeof empresa === 'object') {
@@ -357,7 +418,10 @@ export function respostaConsulta({
     empresa: dados,
     errorCode: def ? def.code : null,
     errorMessage: errorMessage || null,
-    retryable: retryable != null ? retryable === true : (def ? def.retryable : false)
+    retryable: retryable != null ? retryable === true : (def ? def.retryable : false),
+    denominacao: typeof denominacao === 'string' && denominacao.trim() ? denominacao.trim() : null,
+    caesSecundarios: Array.isArray(caesSecundarios)
+      ? caesSecundarios.map(c => String(c)).filter(Boolean) : []
   };
 }
 

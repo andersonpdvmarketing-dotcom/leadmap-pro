@@ -69,7 +69,7 @@ export async function investigarWebsite(website, { max = MAX_PAGINAS, maxTentati
      não têm TLS, e recusá-las apagaria metade da cobertura. As guardas
      de SSRF, timeout e tamanho aplicam-se na mesma. */
   const base = urlSeguro(website, { permitirHttp: true });
-  if (!base) return { paginasLidas: 0, tentativas: 0, achados: [], nif: null, urls: [] };
+  if (!base) return { paginasLidas: 0, tentativas: 0, achados: [], nif: null, urls: [], corpus: '' };
   const dominio = dominioBase(base.hostname);
 
   const achados = [];
@@ -77,6 +77,13 @@ export async function investigarWebsite(website, { max = MAX_PAGINAS, maxTentati
   let nif = null;
   let lidas = 0;
   let tentativas = 0;
+  /* Texto das páginas lidas, para a camada de identidade poder perguntar
+     "este site menciona a firma que o registo devolveu?". É o sinal que
+     distingue uma marca diferente da firma (legítimo, comum) de um NIF
+     de outra empresa deixado num modelo de página (o caso real que deu
+     origem a isto). Fica em memória durante a investigação e não entra
+     no modelo: do site guarda-se um trecho curto, nunca páginas. */
+  let corpus = '';
 
   for (const caminho of CAMINHOS) {
     if (lidas >= max || tentativas >= maxTentativas) break;
@@ -96,9 +103,24 @@ export async function investigarWebsite(website, { max = MAX_PAGINAS, maxTentati
     urls.push(r.url);
     const t = texto(r.texto);
 
+    if (corpus.length < MAX_CORPUS) corpus += ' ' + t;
+
     if (!nif) {
       const n = extrairNif(r.texto);
-      if (n.encontrado) nif = { valor: n.nif, confianca: n.confianca, rotulo: n.rotulo, url: r.url };
+      if (n.encontrado) {
+        nif = {
+          valor: n.nif, confianca: n.confianca, rotulo: n.rotulo, url: r.url,
+          /* o que estava em volta do número, para se poder auditar de
+             quem ele é sem voltar a ir buscar a página */
+          trecho: trechoEmVolta(t, n.nif),
+          candidatos: n.candidatos
+        };
+      } else if (n.candidatos && n.candidatos.length > 1) {
+        /* vários NIFs e nenhum se destaca: não se escolhe, mas registam-se
+           os candidatos para a identidade poder dizer porque não sabe */
+        nif = { valor: null, confianca: null, rotulo: null, url: r.url,
+                trecho: null, candidatos: n.candidatos };
+      }
     }
     for (const a of extrairTudo(t)) achados.push({ ...a, url: r.url });
 
@@ -106,5 +128,17 @@ export async function investigarWebsite(website, { max = MAX_PAGINAS, maxTentati
     if (nif && temCapital) break;
   }
 
-  return { paginasLidas: lidas, tentativas, achados, nif, urls };
+  return { paginasLidas: lidas, tentativas, achados, nif, urls, corpus: corpus.trim() };
+}
+
+/** Máximo de texto acumulado. Chega para as páginas legais, que é onde a firma aparece. */
+const MAX_CORPUS = 200 * 1024;
+
+/** Janela curta em volta de um achado — para auditar, não para arquivar. */
+export function trechoEmVolta(t, alvo, largura = 260) {
+  const s = String(t || '');
+  const i = s.indexOf(String(alvo));
+  if (i < 0) return null;
+  const de = Math.max(0, i - Math.floor(largura / 2));
+  return (de > 0 ? '…' : '') + s.slice(de, de + largura).replace(/\s+/g, ' ').trim() + '…';
 }

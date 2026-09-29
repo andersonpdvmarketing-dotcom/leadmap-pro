@@ -815,6 +815,13 @@ td.td-hist { white-space: nowrap; }
 .emp-tag.ok { color: var(--ok); background: var(--ok-bg); }
 .emp-tag.est { color: var(--warn); background: var(--warn-bg); }
 .emp-tag.conf { color: var(--danger); background: var(--danger-bg, var(--warn-bg)); }
+.porte-ident { font: 600 10px/1.6 var(--font); padding: 1px 6px; border-radius: 999px; color: var(--danger); background: var(--danger-bg, var(--warn-bg)); white-space: nowrap; }
+.pop-ident { margin: 4px 0 2px; display: grid; gap: 2px; }
+.ident-s { font-size: 11px; line-height: 1.5; color: var(--muted); }
+.ident-s.sim { color: var(--ok); }
+.ident-s.nao { color: var(--danger); }
+.ident-d { color: var(--faint); font-family: var(--mono, monospace); font-size: 10px; }
+.ident-bloq { margin-top: 4px; font-size: 11px; line-height: 1.45; color: var(--warn); }
 /* Critérios pedidos, com o estado de cada um. */
 .pop-crit { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .crit-l { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.7; }
@@ -3625,29 +3632,105 @@ function empresaHtml(l) {
   const e = getEmpresa(l);
   const ROT = { nif: 'NIF', cae: 'CAE', funcionarios: 'Funcionários',
                 faturacaoAnual: 'Faturação anual', capitalSocial: 'Capital social' };
+  /* Com a identidade por estabelecer, o NIF não pode aparecer aqui com um
+     "Confirmado" verde ao lado: as duas afirmações são diferentes e quem
+     lê juntava-as numa só. "Confirmado" diz que o número foi mesmo
+     encontrado naquela fonte; não diz que o número é desta empresa. */
+  const vinculoDuvidoso = e.identidade
+    && ['CONFLITO', 'REJEITADA', 'INCONCLUSIVA'].includes(e.identidade.estado);
   const linhas = [];
   for (const c of CAMPOS_EMPRESA) {
     const v = e[c];
     if (!v || v.valor == null) continue;
     const valor = (c === 'faturacaoAnual' || c === 'capitalSocial')
       ? fmtEuroCurto(Number(v.valor)) : String(v.valor);
+    const duvida = c === 'nif' && vinculoDuvidoso;
     /* uma estimativa tem de se anunciar como tal, sempre */
-    const marca = v.estado === 'ESTIMADO' ? '<span class="emp-tag est">Estimativa</span>'
+    const marca = duvida ? '<span class="emp-tag conf">⚠ Vínculo por confirmar</span>'
+      : v.estado === 'ESTIMADO' ? '<span class="emp-tag est">Estimativa</span>'
       : v.estado === 'CONFLITO' ? '<span class="emp-tag conf">Fontes divergem</span>'
       : '<span class="emp-tag ok">Confirmado</span>';
-    linhas.push('<div class="emp-l"><span class="emp-k">' + ROT[c] + '</span>' +
+    linhas.push('<div class="emp-l"><span class="emp-k">' + (duvida ? 'NIF encontrado' : ROT[c]) + '</span>' +
       '<span class="emp-v mono">' + esc(valor) + '</span>' + marca + '</div>');
     /* Aqui, ao contrário da tabela, mostra-se tudo: quem abre os detalhes
        quer perceber de onde veio o número, e num conflito precisa de ver
        as duas afirmações para decidir em qual acredita. */
     linhas.push(evidenciasHtml(e[c]));
   }
+  const identidade = identidadeHtml(e.identidade, e);
   const criterios = criteriosHtml(l);
-  if (!linhas.length && !criterios) return '';
+  if (!linhas.length && !criterios && !identidade) return '';
   const corpo = (linhas.length
     ? '<div class="pop-emp-t">Dados empresariais</div>' + linhas.join('')
     : '');
-  return '<div class="pop-emp">' + corpo + criterios + '</div>';
+  return '<div class="pop-emp">' + corpo + identidade + criterios + '</div>';
+}
+
+/**
+ * De quem é este NIF, e o que isso permite concluir.
+ *
+ * Mostra a firma que o registo devolveu ao lado do nome do lead, os
+ * sinais que pesaram num sentido e no outro, e — quando a identidade não
+ * chega — diz explicitamente que os dados vindos do registo não estão a
+ * ser usados para qualificar a empresa. Um utilizador que veja "CAE
+ * 31004" tem direito a saber que ele é da J. J. LOURO PEREIRA, S.A. e
+ * não da clínica que está a olhar.
+ *
+ * Não aparece quando nunca houve NIF para verificar: um bloco a dizer
+ * "não verificada" em todas as empresas sem NIF seria ruído.
+ */
+function identidadeHtml(id, empresa) {
+  if (!id || !id.nif) return '';
+  if (id.estado === 'NAO_VERIFICADA' && !id.firmaOficial) return '';
+  const CLS = { CONFIRMADA: 'ok', PROVAVEL: 'est', INCONCLUSIVA: 'est',
+                CONFLITO: 'conf', REJEITADA: 'conf', NAO_VERIFICADA: 'est' };
+  /* Três linhas separadas de propósito, porque são três afirmações
+     diferentes e juntá-las é precisamente o erro:
+
+       o número foi encontrado        → NIF encontrado
+       a fonte confirma-o             → Estado da evidência
+       o número é DESTA empresa       → Vínculo com esta empresa
+
+     A terceira é a única que autoriza usar o que dele deriva. */
+  const linhas = ['<div class="pop-emp-t">Identidade empresarial</div>'];
+  linhas.push('<div class="emp-l"><span class="emp-k">NIF encontrado</span>' +
+    '<span class="emp-v mono">' + esc(id.nif) + '</span></div>');
+  const evNif = (empresa && empresa.nif) ? empresa.nif : null;
+  if (evNif && evNif.valor != null) {
+    linhas.push('<div class="emp-l"><span class="emp-k">Estado da evidência</span>' +
+      '<span class="emp-v">' + esc(rotuloEmpresa(evNif)) + '</span>' +
+      (evNif.fonte ? '<span class="emp-tag ok">' + esc(String(evNif.fonte)) + '</span>' : '') +
+      '</div>');
+  }
+  linhas.push('<div class="emp-l"><span class="emp-k">Vínculo com esta empresa</span>' +
+    '<span class="emp-v">' + (CLS[id.estado] === 'conf' ? '⚠ ' : '') +
+    esc(IDENTIDADE_ROTULO_EMPRESA[id.estado] || id.estado) + '</span>' +
+    '<span class="emp-tag ' + CLS[id.estado] + '">' +
+    (typeof id.confianca === 'number' ? Math.round(id.confianca * 100) + '%' : '—') +
+    '</span></div>');
+  if (id.firmaOficial) {
+    linhas.push('<div class="emp-l"><span class="emp-k">Firma associada' +
+      (id.firmaFonte ? ' no ' + esc(id.firmaFonte) : ' a este NIF') + '</span>' +
+      '<span class="emp-v">' + esc(id.firmaOficial) + '</span></div>');
+  }
+
+  const sinais = (id.sinais || []).map(sg => {
+    const bom = SINAIS_POSITIVOS_EMPRESA.includes(sg.sinal);
+    const rot = SINAL_ROTULO_EMPRESA[sg.sinal] || sg.sinal;
+    return '<div class="ident-s ' + (bom ? 'sim' : 'nao') + '">' + (bom ? '✓' : '✗') + ' ' +
+      esc(rot) + (sg.detalhe ? ' <span class="ident-d">' + esc(String(sg.detalhe).slice(0, 70)) + '</span>' : '') +
+      '</div>';
+  });
+  if (sinais.length) linhas.push('<div class="pop-ident">' + sinais.join('') + '</div>');
+
+  const bloqueados = id.derivadosNaoAtribuidos || [];
+  if (bloqueados.length) {
+    linhas.push('<div class="ident-bloq"><strong>Dados derivados deste NIF:</strong> ' +
+      'não atribuídos à empresa. ' +
+      esc(bloqueados.map(d => (d.campo === 'cae' ? 'CAE' : d.campo) + ' ' + d.valor).join(', ')) +
+      ' — guardado para auditoria, não usado para qualificar.</div>');
+  }
+  return linhas.join('');
 }
 
 /**
@@ -3813,6 +3896,23 @@ function porteCell(l) {
   if (emConflito.length) {
     pedacos.push('<span class="porte-conf" title="Fontes divergem sobre ' +
       esc(emConflito.join(', ')) + '. Ver detalhes.">⚠ Conflito</span>');
+  }
+  /* Um aviso compacto, e só quando há mesmo problema de identidade: a
+     tabela não é o sítio para explicar porquê — isso é o popup. Sem isto,
+     um CAE que não é desta empresa apareceria com o aspeto de qualquer
+     outro. NAO_VERIFICADA não acende nada: seria um aviso em quase todas
+     as linhas antigas e deixaria de querer dizer alguma coisa. */
+  const ident = e.identidade;
+  if (ident && ['CONFLITO', 'REJEITADA', 'INCONCLUSIVA'].includes(ident.estado)) {
+    const bloqueados = (ident.derivadosNaoAtribuidos || []).length;
+    pedacos.push('<span class="porte-ident" title="Identidade ' +
+      esc(IDENTIDADE_ROTULO_EMPRESA[ident.estado].toLowerCase()) +
+      /* entidade HTML e não um " literal: isto vai para dentro de um
+         atributo title, e uma aspa crua fecharia o atributo ali mesmo —
+         a firma desaparecia da tooltip sem nada a assinalar o erro */
+      (ident.firmaOficial ? ' — o registo diz &quot;' + esc(ident.firmaOficial) + '&quot;' : '') +
+      (bloqueados ? '. ' + bloqueados + (bloqueados === 1 ? ' dado não atribuído' : ' dados não atribuídos') : '') +
+      '. Ver detalhes.">⚠ Identidade</span>');
   }
   if (!pedacos.length) {
     /* sem critérios e sem conflito, mostra-se o que existir de concreto */
@@ -4303,6 +4403,7 @@ function criteriosPorEstado(avaliacao, alvo) {
 function leadToExportRow(l, contexto = {}) {
   const s = getSocials(l);
   const emp = getEmpresa(l);
+  const ident = emp.identidade || identidadeEmpresaVazia();
   const ig = s.instagram.found ? s.instagram.url : celula(l.instagram);
   const fonteIds = idsDaFonte(l);
   const emails = Array.isArray(l.emails) ? l.emails.map(e => e && e.email).filter(Boolean) : [];
@@ -4377,8 +4478,47 @@ function leadToExportRow(l, contexto = {}) {
     'Nicho (chave)': celula(l.nicho),
     'Fontes de descoberta': Array.isArray(l.fontes) && l.fontes.length ? l.fontes.join(' | ') : '',
     'Emails encontrados': emails.length,
-    'Redes sociais encontradas': SOCIAL_NETS.filter(r => s[r].found).length
+    'Redes sociais encontradas': SOCIAL_NETS.filter(r => s[r].found).length,
+
+    /* ---- BLOCO: identidade empresarial (Fase 3.2) ----
+       Acrescentado no FIM, depois das 91 colunas anteriores, que ficam
+       exatamente onde estavam. Sem estas, uma folha com "CAE 31004" não
+       deixa ver que esse CAE é da J. J. LOURO PEREIRA, S.A. e não da
+       clínica da linha ao lado. */
+    'Identidade empresarial — Estado': ident.nif ? ident.estado : '',
+    'Identidade empresarial — Confiança': (ident.nif && typeof ident.confianca === 'number')
+      ? Math.round(ident.confianca * 100) : '',
+    'Firma oficial': ident.firmaOficial ? seguroParaFolha(String(ident.firmaOficial)) : '',
+    'Identidade — Sinais': sinaisIdentidadeTexto(ident),
+    'Identidade — Conflitos': (ident.conflitos || []).length
+      ? seguroParaFolha(ident.conflitos.join(' | ')) : '',
+    'Identidade — Dados não atribuídos': derivadosBloqueadosTexto(ident)
   };
+}
+
+/**
+ * Os sinais de identidade em texto, com sinal à frente: "+NIF no site
+ * oficial", "-firma não corresponde". O prefixo importa mais do que
+ * parece — sem ele, "firma registada não corresponde ao lead" numa
+ * célula lê-se como se fosse uma qualidade da empresa.
+ */
+function sinaisIdentidadeTexto(ident) {
+  const sinais = (ident && ident.sinais) || [];
+  if (!sinais.length) return '';
+  return seguroParaFolha(sinais.map(sg => {
+    const bom = SINAIS_POSITIVOS_EMPRESA.includes(sg.sinal);
+    return (bom ? '+' : '-') + sg.sinal + (sg.detalhe ? ' (' + String(sg.detalhe).slice(0, 70) + ')' : '');
+  }).join(' | '));
+}
+
+/** O que o registo respondeu e não foi atribuído — e porquê. */
+function derivadosBloqueadosTexto(ident) {
+  const ds = (ident && ident.derivadosNaoAtribuidos) || [];
+  if (!ds.length) return '';
+  return seguroParaFolha(ds.map(d =>
+    (d.campo === 'cae' ? 'CAE' : d.campo) + ' ' + d.valor +
+    ' | ' + (d.fonte || '—') + ' | não atribuído: identidade ' + (d.motivo || '—') +
+    (d.url ? ' | ' + d.url : '')).join('  ||  '));
 }
 
 /**
@@ -4409,7 +4549,8 @@ function leadsToRows(list, opts = {}) {
  * função do nome, por isso não há nada para dessincronizar.
  */
 function larguraDaColuna(nome) {
-  if (/Evidências/.test(nome)) return 60;
+  if (/Evidências|Identidade — (Sinais|Conflitos|Dados)/.test(nome)) return 60;
+  if (/Firma oficial/.test(nome)) return 38;
   if (/URL|Google Maps|Website|Instagram$|Facebook|LinkedIn|TikTok|YouTube/.test(nome)) return 34;
   if (/Critérios|Empresa \/ Profissional|Morada/.test(nome)) return 32;
   if (/— (Estado|Tipo de fonte)/.test(nome)) return 17;
@@ -5753,9 +5894,54 @@ function envelopeEmpresaVazio() {
   return { valor: null, fonte: null, consultadoEm: null, confianca: null, estado: 'NAO_CONSULTADO' };
 }
 
+/* ---------- Identidade empresarial (Fase 3.2) ----------
+   Espelho de providers/company/identidade.mjs, que é a autoridade e onde
+   os testes vivem. O bloco clássico não faz import.
+
+   A PERGUNTA QUE ISTO RESPONDE
+   ----------------------------
+   Não é "este número é um NIF válido?" — é "este NIF é desta empresa?".
+   Eram tratadas como a mesma pergunta, e por isso o CAE de um fabricante
+   de mobiliário (J. J. LOURO PEREIRA, S.A., NIPC 501135227) apareceu
+   numa clínica dentária de Odivelas que tinha esse NIPC na página de
+   termos, herdado de um modelo de site.
+
+   Enquanto a identidade não chegar, os dados que vieram do NIF ficam
+   guardados e visíveis, mas não são atribuídos à empresa. */
+const IDENTIDADES_EMPRESA = ['CONFIRMADA', 'PROVAVEL', 'INCONCLUSIVA', 'CONFLITO', 'REJEITADA', 'NAO_VERIFICADA'];
+const IDENTIDADE_ROTULO_EMPRESA = {
+  CONFIRMADA: 'Confirmada', PROVAVEL: 'Provável', INCONCLUSIVA: 'Inconclusiva',
+  CONFLITO: 'Em conflito', REJEITADA: 'Rejeitada', NAO_VERIFICADA: 'Não verificada'
+};
+const SINAL_ROTULO_EMPRESA = {
+  NOME_EXATO: 'nome comercial igual à firma registada',
+  NOME_NORMALIZADO: 'nome comercial contido na firma registada',
+  TOKEN_DISTINTIVO: 'palavra distintiva comum ao nome e à firma',
+  FIRMA_NO_SITE: 'firma registada mencionada no próprio site',
+  DOMINIO_COMPATIVEL: 'domínio compatível com a firma',
+  NIF_CONTEXTUAL: 'NIF com rótulo legal explícito',
+  CONTEXTO_LEGAL: 'NIF em página legal da empresa',
+  NOME_INCOMPATIVEL: 'firma registada não corresponde ao lead',
+  TERCEIRO_EXPLICITO: 'NIF junto a indicação de terceiro',
+  MULTIPLOS_CANDIDATOS: 'vários NIFs na mesma página',
+  FIRMA_DESCONHECIDA: 'registo não devolveu a firma'
+};
+/* Os sinais que contam a favor — o ✓ do popup contra o ✗. */
+const SINAIS_POSITIVOS_EMPRESA = ['NOME_EXATO', 'NOME_NORMALIZADO', 'TOKEN_DISTINTIVO',
+  'FIRMA_NO_SITE', 'DOMINIO_COMPATIVEL', 'NIF_CONTEXTUAL', 'CONTEXTO_LEGAL'];
+
+function identidadeEmpresaVazia() {
+  return { estado: 'NAO_VERIFICADA', confianca: null, nif: null, nomeLead: null,
+           firmaOficial: null, firmaFonte: null, dominio: null, sinais: [], conflitos: [],
+           candidatos: [], derivadosNaoAtribuidos: [], validadoEm: null };
+}
+
 function semDadosEmpresa() {
   const o = {};
   for (const c of CAMPOS_EMPRESA) o[c] = envelopeEmpresaVazio();
+  /* irmã dos campos, não um deles: responde a outra pergunta e por isso
+     fica fora de CAMPOS_EMPRESA */
+  o.identidade = identidadeEmpresaVazia();
   return o;
 }
 
@@ -5783,6 +5969,21 @@ function getEmpresa(l) {
     /* as evidências são a razão de o conflito ser inspecionável: uma
        leitura que as deitasse fora tornaria o estado CONFLITO opaco */
     if (Array.isArray(v.evidencias) && v.evidencias.length) base[c].evidencias = v.evidencias;
+    /* de que NIF e de que identidade este dado depende */
+    if (v.dependeDe && typeof v.dependeDe === 'object') base[c].dependeDe = v.dependeDe;
+  }
+  /* Um snapshot gravado antes desta camada não tem identidade — e isso não
+     é o mesmo que ter sido verificada e falhado. NAO_VERIFICADA diz a
+     verdade sobre ele, e a próxima investigação resolve-o. */
+  const i = e.identidade;
+  if (i && typeof i === 'object' && IDENTIDADES_EMPRESA.includes(i.estado)) {
+    base.identidade = Object.assign(identidadeEmpresaVazia(), i, {
+      sinais: Array.isArray(i.sinais) ? i.sinais : [],
+      conflitos: Array.isArray(i.conflitos) ? i.conflitos : [],
+      candidatos: Array.isArray(i.candidatos) ? i.candidatos : [],
+      derivadosNaoAtribuidos: Array.isArray(i.derivadosNaoAtribuidos)
+        ? i.derivadosNaoAtribuidos.filter(d => d && CAMPOS_EMPRESA.includes(d.campo)) : []
+    });
   }
   return base;
 }
@@ -5897,6 +6098,34 @@ function avaliarCriterioTexto(env, procura, qualidade) {
     ? STATUS_CRITERIO.CUMPRE : STATUS_CRITERIO.NAO_CUMPRE;
 }
 
+/* Este campo veio do NIF? Diretamente, se a investigação marcou
+   `dependeDe`; indiretamente, para snapshots antigos, se tem evidência de
+   FONTE_OFICIAL — ao registo oficial só se chega por NIF. */
+function dependeDeIdentidadeEmpresa(env) {
+  if (!env) return false;
+  if (env.dependeDe) return true;
+  const evs = evidenciasDeEmpresa(env);
+  return evs.some(e => e && e.tipoFonte === 'FONTE_OFICIAL');
+}
+
+/* ESTRITO exige CONFIRMADA; INTELIGENTE aceita PROVAVEL; EXPLORATORIO
+   mostra tudo, com os alertas à vista. */
+function identidadeChegaParaEmpresa(identidade, modo) {
+  const e = (identidade && identidade.estado) || 'NAO_VERIFICADA';
+  if (modo === 'EXPLORATORIO') return true;
+  if (modo === 'ESTRITO') return e === 'CONFIRMADA';
+  return e === 'CONFIRMADA' || e === 'PROVAVEL';
+}
+
+/* Baixa a DESCONHECIDO nos dois sentidos: um dado que não é desta empresa
+   não prova nada sobre ela, nem a favor nem contra. */
+function ajustarPorIdentidadeEmpresa(status, env, identidade, modo) {
+  if (status === STATUS_CRITERIO.DESCONHECIDO) return status;
+  if (!dependeDeIdentidadeEmpresa(env)) return status;
+  if (identidadeChegaParaEmpresa(identidade, modo)) return status;
+  return STATUS_CRITERIO.DESCONHECIDO;
+}
+
 function classificarMatch(status) {
   const vs = Object.values(status || {});
   if (!vs.length) return 'FORTE';
@@ -5920,10 +6149,14 @@ function avaliarEmpresa(empresa, f) {
   const pares = [['funcionarios', f.minFuncionarios], ['faturacaoAnual', f.minFaturacaoAnual], ['capitalSocial', f.minCapitalSocial]];
   for (const [campo, minimo] of pares) {
     if (minimo == null) continue;
-    status[campo] = avaliarCriterioNumerico(e[campo], minimo, q);
+    status[campo] = ajustarPorIdentidadeEmpresa(
+      avaliarCriterioNumerico(e[campo], minimo, q), e[campo], e.identidade, modo);
   }
   const cae = String((f && f.caeQuery) || '').trim();
-  if (cae) status.cae = avaliarCriterioTexto(e.cae, cae, q);
+  if (cae) {
+    status.cae = ajustarPorIdentidadeEmpresa(
+      avaliarCriterioTexto(e.cae, cae, q), e.cae, e.identidade, modo);
+  }
   /* Sem dado jurídico no modelo, o critério fica DESCONHECIDO — que é a
      verdade — em vez de excluir toda a gente como se soubéssemos. */
   if (String((f && f.estadoEmpresa) || '').trim()) status.estadoEmpresa = STATUS_CRITERIO.DESCONHECIDO;

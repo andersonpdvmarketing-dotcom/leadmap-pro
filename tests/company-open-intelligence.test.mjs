@@ -276,12 +276,17 @@ test('empresa sem website não produz leitura nenhuma', async () => {
  * ================================================================ */
 
 const SITE = {
-  'https://alfa.pt/': '<p>Bem-vindos</p>',
-  'https://alfa.pt/contactos': '<p>NIPC: ' + NIPC + ' · Somos uma equipa de 47 profissionais</p>',
-  'https://alfa.pt/termos': '<footer>Capital Social: €75.000</footer>'
+  'https://medibracara.pt/': '<p>Bem-vindos</p>',
+  'https://medibracara.pt/contactos': '<p>NIPC: ' + NIPC + ' · Somos uma equipa de 47 profissionais</p>',
+  'https://medibracara.pt/termos': '<footer>Capital Social: €75.000</footer>'
 };
 const investigarSite = (w) => investigarWebsite(w, { fetchPagina: siteSimulado(SITE) });
-const LEAD = { id: 'g-1', nome: 'Alfa', website: 'https://alfa.pt' };
+/* O nome do lead e a firma que o SICAE simulado devolve têm de ser a
+   MESMA empresa. Enquanto o lead se chamou "Alfa" e o registo
+   respondeu "MEDIBRACARA", a fixture descrevia um NIF de outra
+   entidade — e a partir da Fase 3.2 é isso que a camada de
+   identidade bloqueia, com razão. */
+const LEAD = { id: 'g-1', nome: 'Medibracara', website: 'https://medibracara.pt' };
 
 test('pipeline: junta website e SICAE', async () => {
   const r = await investigarEmpresa(LEAD, { sicae: sicaeSimulado(), investigar: investigarSite });
@@ -308,14 +313,14 @@ test('pipeline: website em baixo não derruba nada', async () => {
 });
 
 test('pipeline: páginas lidas sem achado dá NAO_ENCONTRADO, não NAO_CONSULTADO', async () => {
-  const vazio = (w) => investigarWebsite(w, { fetchPagina: siteSimulado({ 'https://alfa.pt/': '<p>nada</p>' }) });
+  const vazio = (w) => investigarWebsite(w, { fetchPagina: siteSimulado({ 'https://medibracara.pt/': '<p>nada</p>' }) });
   const r = await investigarEmpresa(LEAD, { sicae: sicaeSimulado(), investigar: vazio });
   assert.equal(r.empresa.capitalSocial.estado, 'NAO_ENCONTRADO', 'procurou-se mesmo');
 });
 
 test('pipeline: um mínimo declarado é ESTIMADO, não CONFIRMADO', async () => {
   const site = (w) => investigarWebsite(w, { fetchPagina: siteSimulado({
-    'https://alfa.pt/': '<p>Mais de 120 colaboradores</p>' }) });
+    'https://medibracara.pt/': '<p>Mais de 120 colaboradores</p>' }) });
   const r = await investigarEmpresa(LEAD, { sicae: sicaeSimulado({ falha: true }), investigar: site });
   assert.equal(r.empresa.funcionarios.valor, 120);
   assert.equal(r.empresa.funcionarios.estado, 'ESTIMADO',
@@ -324,7 +329,7 @@ test('pipeline: um mínimo declarado é ESTIMADO, não CONFIRMADO', async () => 
 
 test('pipeline: conflito entre website e SICAE fica registado', async () => {
   const site = (w) => investigarWebsite(w, { fetchPagina: siteSimulado({
-    'https://alfa.pt/': '<p>NIPC: ' + NIPC + ' · CAE 41200</p>' }) });
+    'https://medibracara.pt/': '<p>NIPC: ' + NIPC + ' · CAE 41200</p>' }) });
   const r = await investigarEmpresa(LEAD, { sicae: sicaeSimulado(), investigar: site });
   const evs = evidenciasDe(r.empresa.cae);
   assert.equal(evs.length, 2, 'as duas afirmações têm de ser guardadas');
@@ -376,7 +381,7 @@ test('cache: expira conforme o TTL de cada fonte', () => {
 });
 
 test('fila: concorrência limitada e teto por lote', async () => {
-  const leads = Array.from({ length: 40 }, (_, i) => ({ id: 'g' + i, website: 'https://alfa.pt' }));
+  const leads = Array.from({ length: 40 }, (_, i) => ({ id: 'g' + i, website: 'https://medibracara.pt' }));
   let emCurso = 0, pico = 0;
   const investigar = async (w) => {
     emCurso++; pico = Math.max(pico, emCurso);
@@ -390,7 +395,7 @@ test('fila: concorrência limitada e teto por lote', async () => {
 });
 
 test('fila: reporta progresso sem esperar pelo fim', async () => {
-  const leads = Array.from({ length: 6 }, (_, i) => ({ id: 'g' + i, website: 'https://alfa.pt' }));
+  const leads = Array.from({ length: 6 }, (_, i) => ({ id: 'g' + i, website: 'https://medibracara.pt' }));
   const marcos = [];
   await investigarLote(leads, {
     concorrencia: 2, max: 6, sicae: sicaeSimulado({ falha: true }), investigar: investigarSite,
@@ -401,7 +406,7 @@ test('fila: reporta progresso sem esperar pelo fim', async () => {
 });
 
 test('fila: um lead que rebenta não derruba o lote', async () => {
-  const leads = [{ id: 'a', website: 'https://alfa.pt' }, { id: 'b', website: 'https://alfa.pt' }];
+  const leads = [{ id: 'a', website: 'https://medibracara.pt' }, { id: 'b', website: 'https://medibracara.pt' }];
   let n = 0;
   const investigar = async (w) => { n++; if (n === 1) throw new Error('rebentou'); return { paginasLidas: 1, tentativas: 1, achados: [], nif: null, urls: [] }; };
   const res = await investigarLote(leads, { concorrencia: 1, sicae: sicaeSimulado({ falha: true }), investigar });
@@ -482,15 +487,19 @@ test('a rota de servidor não devolve 500 nem detalhes de erro', () => {
  * ================================================================ */
 
 test('um lead da Fase 1 com NIF já conhecido não é relido do site', async () => {
-  const comNif = { id: 'g-2', website: 'https://alfa.pt',
+  const comNif = { id: 'g-2', website: 'https://medibracara.pt',
     empresa: { nif: { valor: NIPC, fonte: 'site', consultadoEm: '2026-01-01', confianca: 0.9, estado: 'CONFIRMADO' } } };
   const sicae = sicaeSimulado();
   const r = await investigarEmpresa(comNif, { sicae, investigar: async () => null });
   assert.equal(r.empresa.cae.valor, '86230', 'o NIF que já tínhamos devia bastar para o SICAE');
+  /* Este lead não traz nome nenhum e o site não foi lido: a única
+     corroboração é o domínio ser a palavra da firma. Dá PROVÁVEL — que
+     atribui o dado — e não CONFIRMADA, que exigiria mais. */
+  assert.equal(r.identidade.estado, 'PROVAVEL');
 });
 
 test('um lead sem campo empresa é investigado na mesma', async () => {
-  const r = await investigarEmpresa({ id: 'g-3', website: 'https://alfa.pt' },
+  const r = await investigarEmpresa({ id: 'g-3', website: 'https://medibracara.pt' },
     { sicae: sicaeSimulado(), investigar: investigarSite });
   assert.equal(r.empresa.nif.valor, NIPC);
 });

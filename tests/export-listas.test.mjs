@@ -64,9 +64,13 @@ const FONTE = [
      colunas originais serem exercidas com um lead sem empresa. */
   'const CAMPOS_EMPRESA = ["nif","cae","capitalSocial","funcionarios","faturacaoAnual"];',
   'function evidenciasDeEmpresa(c) { return (c && Array.isArray(c.evidencias)) ? c.evidencias : []; }',
+  'const SINAIS_POSITIVOS_EMPRESA = [];',
+  'function identidadeEmpresaVazia() { return { estado: "NAO_VERIFICADA", confianca: null,',
+  '  nif: null, nomeLead: null, firmaOficial: null, dominio: null, sinais: [], conflitos: [],',
+  '  candidatos: [], derivadosNaoAtribuidos: [], validadoEm: null }; }',
   'function getEmpresa() { const o = {}; for (const c of CAMPOS_EMPRESA)',
   '  o[c] = { valor: null, fonte: null, consultadoEm: null, confianca: null, estado: "NAO_CONSULTADO" };',
-  '  return o; }',
+  '  o.identidade = identidadeEmpresaVazia(); return o; }',
   extrair('function instagramUsername(url)', 'function buildWorkbook'),
   'return { leadsToRows, instagramUsername, idsDaFonte, celula };'
 ].join('\n');

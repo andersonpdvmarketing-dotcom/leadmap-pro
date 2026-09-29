@@ -38,6 +38,8 @@
  */
 
 import { ESTADO_DADO, CAMPOS_NUMERICOS, temValor } from './contract.mjs';
+import { TIPO_FONTE } from './contract.mjs';
+import { IDENTIDADE } from './identidade.mjs';
 
 /* ---------------------------------------------------------------- *
  * Qualidade exigida                                                 *
@@ -254,6 +256,61 @@ export const MATCH_ROTULO = Object.freeze({
 });
 
 /* ---------------------------------------------------------------- *
+ * Identidade: quando é que um dado derivado pode provar               *
+ * ---------------------------------------------------------------- */
+
+/**
+ * Este campo veio do NIF?
+ *
+ * Duas maneiras de saber. A direta: a investigação marcou `dependeDe`
+ * quando promoveu o dado. A indireta, para snapshots gravados antes desta
+ * camada existir: uma evidência de FONTE_OFICIAL só pode ter vindo do
+ * registo, e ao registo só se chega por NIF.
+ */
+export function dependeDeIdentidade(env) {
+  if (!env) return false;
+  if (env.dependeDe) return true;
+  const evs = Array.isArray(env.evidencias) ? env.evidencias : [];
+  return evs.some(e => e && e.tipoFonte === TIPO_FONTE.FONTE_OFICIAL);
+}
+
+/**
+ * A identidade chega para este modo?
+ *
+ * ESTRITO exige CONFIRMADA: em modo estrito um critério só conta como
+ * prova se a identidade da empresa estiver estabelecida, e PROVAVEL é
+ * exatamente "ainda não está".
+ *
+ * INTELIGENTE aceita PROVAVEL — o dado é mostrado e conta — mas continua
+ * a recusar INCONCLUSIVA, CONFLITO, REJEITADA e NAO_VERIFICADA.
+ *
+ * EXPLORATORIO não filtra por identidade: quem escolhe explorar quer ver
+ * tudo, com os alertas à vista.
+ */
+export function identidadeChegaPara(identidade, modo) {
+  const e = (identidade && identidade.estado) || IDENTIDADE.NAO_VERIFICADA;
+  if (modo === MODO.EXPLORATORIO) return true;
+  if (modo === MODO.ESTRITO) return e === IDENTIDADE.CONFIRMADA;
+  return e === IDENTIDADE.CONFIRMADA || e === IDENTIDADE.PROVAVEL;
+}
+
+/**
+ * Baixa um critério a DESCONHECIDO quando ele depende de uma identidade
+ * que não chega.
+ *
+ * Baixa nos dois sentidos, e isso é deliberado: se não se pode atribuir
+ * o CAE a esta empresa, também não se pode dizer que ela NÃO cumpre o
+ * critério do CAE. Um dado que não é da empresa não prova nada sobre ela,
+ * nem a favor nem contra.
+ */
+export function ajustarPorIdentidade(status, env, identidade, modo) {
+  if (status === STATUS_CRITERIO.DESCONHECIDO) return status;
+  if (!dependeDeIdentidade(env)) return status;
+  if (identidadeChegaPara(identidade, modo)) return status;
+  return STATUS_CRITERIO.DESCONHECIDO;
+}
+
+/* ---------------------------------------------------------------- *
  * Avaliação                                                         *
  * ---------------------------------------------------------------- */
 
@@ -318,11 +375,15 @@ export function avaliarEmpresa(empresa, f) {
                                  ['capitalSocial', f.minCapitalSocial]]) {
     if (minimo == null) continue;
     if (!CAMPOS_NUMERICOS.includes(campo)) continue;
-    status[campo] = avaliarCriterioNumerico(e[campo], minimo, q);
+    status[campo] = ajustarPorIdentidade(
+      avaliarCriterioNumerico(e[campo], minimo, q), e[campo], e.identidade, modo);
   }
 
   const cae = String((f && f.caeQuery) || '').trim();
-  if (cae) status.cae = avaliarCriterioTexto(e.cae, cae, q);
+  if (cae) {
+    status.cae = ajustarPorIdentidade(
+      avaliarCriterioTexto(e.cae, cae, q), e.cae, e.identidade, modo);
+  }
 
   /* O modelo não tem estado jurídico e não o vai inferir. O critério
      fica DESCONHECIDO — que é a verdade — em vez de excluir toda a

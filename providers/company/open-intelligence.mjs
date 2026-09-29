@@ -29,6 +29,8 @@ import {
 } from './contract.mjs';
 import { investigarWebsite } from './website-deep.mjs';
 import { SicaeProvider } from './sicae.mjs';
+import { avaliarIdentidade, identidadeSuficiente, dependenciaDeIdentidade,
+         identidadeVazia, IDENTIDADE } from './identidade.mjs';
 import { nifValido, normalizarNif } from './nif.mjs';
 
 /* ---------------------------------------------------------------- *
@@ -136,6 +138,13 @@ export async function investigarEmpresa(lead, {
 
   const website = lead && lead.website && lead.website !== 'N/D' ? lead.website : null;
   let nif = empresa.nif && empresa.nif.valor ? String(empresa.nif.valor) : null;
+  /* matéria-prima da identidade: o texto do site e o contexto do NIF.
+     Nenhuma das duas é gravada no modelo — do site guarda-se um trecho. */
+  let corpusSite = '';
+  let contextoNif = { trecho: null, rotulo: null, url: null, candidatos: [] };
+  let firmaOficial = null;
+  let firmaFonte = null;
+  let evsSicae = [];
 
   /* ---- 1/2/3. website ---- */
   if (website) {
@@ -152,6 +161,14 @@ export async function investigarEmpresa(lead, {
     }
     if (r) {
       fontes.push({ fonte: 'website', cache: Boolean(cacheado), paginas: r.paginasLidas });
+      corpusSite = r.corpus || '';
+      if (r.nif) {
+        /* o contexto do NIF viaja para a camada de identidade mesmo
+           quando não houve escolha: candidatos empatados são a razão
+           pela qual não se sabe, e isso tem de ficar dito */
+        contextoNif = { trecho: r.nif.trecho || null, rotulo: r.nif.rotulo || null,
+                        url: r.nif.url || null, candidatos: r.nif.candidatos || [] };
+      }
       if (!nif && r.nif && nifValido(r.nif.valor)) {
         nif = normalizarNif(r.nif.valor);
         empresa.nif = comEvidencia(empresa.nif, evidencia({
@@ -195,11 +212,14 @@ export async function investigarEmpresa(lead, {
     }
     if (r && r.empresa) {
       fontes.push({ fonte: 'sicae', cache: Boolean(cacheado) });
+      /* a denominação oficial é o que permite perguntar de quem é o NIF */
+      firmaOficial = r.denominacao || null;
+      firmaFonte = firmaOficial ? nomeDoRegisto(r, sicae) : null;
       /* o CAE do SICAE é oficial e entra como mais uma evidência: se o
          website dizia outro, o conflito fica registado em vez de um
          sobrepor o outro em silêncio */
       const evs = (r.empresa.cae && Array.isArray(r.empresa.cae.evidencias)) ? r.empresa.cae.evidencias : [];
-      for (const ev of evs) empresa.cae = comEvidencia(empresa.cae, ev);
+      evsSicae = evs;
       /* O provider já distingue "consultei e não há" de "não consegui
          consultar": o primeiro devolve NAO_ENCONTRADO, o segundo deixa
          NAO_CONSULTADO. Adotar esse estado em vez de o decidir aqui — a
@@ -212,7 +232,63 @@ export async function investigarEmpresa(lead, {
     }
   }
 
-  return { empresa, fontes, erros, auditoria };
+  /* ---- 6. identidade: de quem é este NIF? ----
+     Corre depois do registo porque precisa da firma, e antes de o CAE ser
+     promovido porque é ela que decide se pode ser. */
+  const identidade = nif
+    ? avaliarIdentidade({
+        nomeLead: (lead && lead.nome) || '',
+        dominio: website,
+        firmaOficial,
+        firmaFonte,
+        nif,
+        rotuloNif: contextoNif.rotulo,
+        trecho: contextoNif.trecho,
+        urlNif: contextoNif.url,
+        corpusSite,
+        candidatos: contextoNif.candidatos,
+        agora: quando
+      })
+    : identidadeVazia();
+
+  /* ---- 7. dados derivados do NIF ----
+     O CAE do SICAE é oficial e correto PARA O NIF CONSULTADO. Se a
+     identidade não liga esse NIF a este lead, o dado continua guardado e
+     auditável, mas não é atribuído: era exatamente assim que o CAE de um
+     fabricante de móveis passava a ser o CAE de uma clínica dentária. */
+  if (evsSicae.length) {
+    if (identidadeSuficiente(identidade)) {
+      const dep = dependenciaDeIdentidade(identidade);
+      for (const ev of evsSicae) empresa.cae = comEvidencia(empresa.cae, ev);
+      empresa.cae.dependeDe = dep;
+    } else {
+      for (const ev of evsSicae) {
+        identidade.derivadosNaoAtribuidos.push({
+          campo: 'cae', valor: ev.valor, fonte: ev.fonte, url: ev.url || null,
+          consultadoEm: ev.consultadoEm || null, motivo: identidade.estado
+        });
+      }
+      /* O registo foi consultado — deixar o campo em NAO_CONSULTADO diria
+         que ninguém procurou, e isso é falso. Procurou-se, e não se
+         obteve um CAE que se possa atribuir a ESTE lead. A razão fica no
+         envelope da identidade, não escondida num estado ambíguo. */
+      if (empresa.cae.estado === ESTADO_DADO.NAO_CONSULTADO) empresa.cae = naoEncontrado();
+      auditoria.push({ campo: 'cae', valor: evsSicae[0].valor, url: evsSicae[0].url,
+                       contexto: 'não atribuído: identidade ' + identidade.estado });
+    }
+  }
+
+  empresa.identidade = identidade;
+  return { empresa, fontes, erros, auditoria, identidade };
+}
+
+/** O nome legível do registo que respondeu, para o ecrã não o adivinhar. */
+function nomeDoRegisto(resposta, prov) {
+  const ev = resposta && resposta.empresa && resposta.empresa.cae
+    && Array.isArray(resposta.empresa.cae.evidencias) ? resposta.empresa.cae.evidencias[0] : null;
+  if (ev && ev.fonte) return String(ev.fonte);
+  if (prov && prov.nome) return String(prov.nome);
+  return resposta && resposta.provider ? String(resposta.provider).toUpperCase() : null;
 }
 
 /* ---------------------------------------------------------------- *
