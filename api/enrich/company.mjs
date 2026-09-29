@@ -54,6 +54,10 @@ export default async function handler(req, res) {
   /* só o que a investigação precisa; nada mais do lead atravessa */
   const lead = {
     id: leadId,
+    /* texto e nada mais: serve para comparar com a firma do registo, e
+       quem o consome normaliza-o antes de o usar. Cortado como os
+       outros campos — um nome de 200 caracteres já não é um nome. */
+    nome: typeof bruto.nome === 'string' ? bruto.nome.trim().slice(0, 200) : null,
     website: typeof bruto.website === 'string' ? bruto.website.slice(0, 2048) : null,
     empresa: (bruto.nif && typeof bruto.nif === 'string')
       ? { nif: { valor: bruto.nif.slice(0, 20), fonte: 'cliente', consultadoEm: new Date().toISOString(), confianca: 0.9, estado: 'CONFIRMADO' } }

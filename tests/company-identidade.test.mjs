@@ -652,3 +652,168 @@ test('os três estados de alerta levam a marca no NIF; os outros não', () => {
   assert.deepEqual(comAlerta, ['INCONCLUSIVA', 'CONFLITO', 'REJEITADA'],
     'a lista da tabela e a do popup têm de ser a mesma');
 });
+
+/* ================================================================ *
+ * O nome do lead tem de chegar ao servidor                          *
+ * ---------------------------------------------------------------- *
+ * O contrato da rota sempre disse { id, nome, website, nif }, mas o
+ * frontend enviava três campos e o saneamento da API descartava o
+ * quarto. Resultado: em produção os sinais de nome — NOME_EXATO,
+ * NOME_NORMALIZADO, TOKEN_DISTINTIVO — nunca podiam disparar, e uma
+ * empresa legítima cujo domínio não diga nada ficava por confirmar.
+ *
+ * O algoritmo estava certo. Faltava-lhe o input.
+ * ================================================================ */
+
+const API_SRC = readFileSync(new URL('../api/enrich/company.mjs', import.meta.url), 'utf8');
+
+test('1: o frontend envia o nome no payload', () => {
+  const bloco = HTML.slice(HTML.indexOf("fetchWithTimeout('/api/enrich/company'"),
+                           HTML.indexOf("fetchWithTimeout('/api/enrich/company'") + 900);
+  assert.match(bloco, /nome:\s*lead\.nome/, 'o payload não leva o nome');
+  /* o campo real do modelo, não um inventado */
+  assert.ok(!/nomeEmpresa|razaoSocial|companyName/.test(bloco), 'propriedade inventada');
+  /* "N/D" é ausência, não um nome — a mesma guarda que o website já tinha */
+  assert.match(bloco, /lead\.nome !== ND/, 'N/D seria enviado como se fosse um nome');
+  /* e continua a não ir o lead inteiro */
+  assert.equal(/JSON\.stringify\(\{ lead: lead \}/.test(bloco), false);
+});
+
+test('2/3: a API aceita o nome e limita-o como os outros campos', () => {
+  assert.match(API_SRC, /nome: typeof bruto\.nome === 'string'/, 'a API não saneia o nome');
+  assert.match(API_SRC, /bruto\.nome\.trim\(\)\.slice\(0, 200\)/, 'sem trim ou sem limite');
+  /* nada de interpretação: só string, corte e nada mais */
+  const linha = API_SRC.split('\n').find(l => l.includes('nome: typeof bruto.nome'));
+  assert.equal(/eval|Function|JSON\.parse|require|import\(/.test(linha), false);
+});
+
+test('4: a ausência de nome não quebra nada — continua opcional', async () => {
+  for (const nome of [undefined, null, '', 42, {}, []]) {
+    const r = await investigarEmpresa(
+      { id: 'x', nome, website: 'https://medibracara.pt' },
+      { sicae: sicaeSimulado(),
+        investigar: investigarCom({ 'https://medibracara.pt/': '<p>NIPC: ' + NIPC + '</p>' }) });
+    assert.ok(IDENTIDADES_VALIDAS.includes(r.identidade.estado), JSON.stringify(nome));
+  }
+});
+
+test('5: o nome atravessa a cadeia até à identidade', async () => {
+  const r = await investigarEmpresa(
+    { id: 'x', nome: 'Medibracara', website: 'https://medibracara.pt' },
+    { sicae: sicaeSimulado(),
+      investigar: investigarCom({ 'https://medibracara.pt/': '<p>NIPC: ' + NIPC + '</p>' }) });
+  assert.equal(r.identidade.nomeLead, 'Medibracara',
+    'o nome tem de aparecer do outro lado, no envelope da identidade');
+});
+
+/* ---- 6, 7, 8: cada sinal de nome dispara ponta a ponta ---- */
+
+const semSinalDeDominio = (nome, paginas) => investigarEmpresa(
+  { id: 'x', nome, website: 'https://saude-online-pt.com' },
+  { sicae: sicaeSimulado(),
+    investigar: investigarCom(Object.assign(
+      { 'https://saude-online-pt.com/': '<p>NIPC: ' + NIPC + '</p>' }, paginas || {})) });
+
+test('6: NOME_EXATO dispara ponta a ponta', async () => {
+  const r = await semSinalDeDominio('Medibracara Centro Médico');
+  assert.ok(r.identidade.sinais.some(s => s.sinal === SINAL.NOME_EXATO),
+    r.identidade.sinais.map(s => s.sinal).join(','));
+  assert.equal(r.identidade.estado, IDENTIDADE.CONFIRMADA);
+});
+
+test('7: NOME_NORMALIZADO dispara ponta a ponta', async () => {
+  const r = await semSinalDeDominio('Medibracara');
+  assert.ok(r.identidade.sinais.some(s => s.sinal === SINAL.NOME_NORMALIZADO),
+    r.identidade.sinais.map(s => s.sinal).join(','));
+});
+
+test('8: TOKEN_DISTINTIVO dispara ponta a ponta', async () => {
+  /* nome comercial diferente da firma, mas com a palavra que distingue */
+  const r = await semSinalDeDominio('Medibracara — Marcações Online');
+  assert.ok(r.identidade.sinais.some(s => s.sinal === SINAL.TOKEN_DISTINTIVO),
+    r.identidade.sinais.map(s => s.sinal).join(','));
+});
+
+test('9: um nome incompatível continua a gerar conflito', async () => {
+  /* o caso real: o nome chegar ao servidor não pode reabilitá-lo */
+  const r = await investigarEmpresa(
+    { id: 'x', nome: 'Clínica Onda de Sorrisos', website: 'https://ondadesorrisos.com' },
+    { sicae: sicaeSimulado({ nipc: NIPC_ERRADO, firma: 'J. J. LOURO PEREIRA, S.A.', cae: '31004' }),
+      investigar: investigarCom({ 'https://ondadesorrisos.com/':
+        '<p>Clínica Onda de Sorrisos</p><footer>NIPC ' + NIPC_ERRADO + ', com sede em Odivelas</footer>' }) });
+  assert.equal(r.identidade.estado, IDENTIDADE.CONFLITO);
+  assert.ok(r.identidade.sinais.some(s => s.sinal === SINAL.NOME_INCOMPATIVEL));
+});
+
+test('10: com o nome, nada é promovido que não devesse ser', async () => {
+  const r = await investigarEmpresa(
+    { id: 'x', nome: 'Clínica Onda de Sorrisos', website: 'https://ondadesorrisos.com' },
+    { sicae: sicaeSimulado({ nipc: NIPC_ERRADO, firma: 'J. J. LOURO PEREIRA, S.A.', cae: '31004' }),
+      investigar: investigarCom({ 'https://ondadesorrisos.com/':
+        '<footer>NIPC ' + NIPC_ERRADO + ', com sede em Odivelas</footer>' }) });
+  assert.equal(r.empresa.cae.valor, null, 'o CAE 31004 continua a não ser atribuído');
+  assert.equal(r.identidade.derivadosNaoAtribuidos[0].valor, '31004');
+  assert.equal(r.empresa.nif.valor, NIPC_ERRADO, 'e o NIF continua preservado');
+});
+
+/* ---- §10: a fixture que prova que o hotfix tem efeito real ---- */
+
+test('o nome é a diferença entre confirmar e marcar conflito', async () => {
+  /* Domínio que não diz nada ("saude-online-pt"), site que nunca repete a
+     firma, e um nome comercial que partilha a palavra distintiva. É o
+     caso em que o nome é a ÚNICA corroboração possível. */
+  const paginas = { 'https://saude-online-pt.com/':
+    '<p>Marcações e horários</p><footer>NIPC ' + NIPC + ', com sede em Braga</footer>' };
+  const correr = (nome) => investigarEmpresa(
+    { id: 'x', nome, website: 'https://saude-online-pt.com' },
+    { sicae: sicaeSimulado(), investigar: investigarCom(paginas) });
+
+  const sem = await correr(null);
+  const com = await correr('Medibracara');
+
+  /* sem nome: nada corrobora e a empresa legítima cai em conflito */
+  assert.equal(sem.identidade.estado, IDENTIDADE.CONFLITO);
+  assert.equal(sem.empresa.cae.valor, null, 'o CAE legítimo não era atribuído');
+
+  /* com nome: a palavra distintiva fecha a identidade */
+  assert.equal(com.identidade.estado, IDENTIDADE.CONFIRMADA);
+  assert.equal(com.empresa.cae.valor, '86230', 'o CAE legítimo volta a ser atribuído');
+  assert.ok(com.identidade.sinais.some(s =>
+    [SINAL.NOME_NORMALIZADO, SINAL.TOKEN_DISTINTIVO].includes(s.sinal)));
+});
+
+/* ---- §7: o nome é dado, nunca instrução ---- */
+
+test('o nome é tratado exclusivamente como dado', async () => {
+  const perigosos = [
+    'Clínica Açúcar & Conceição',                      /* acentos e & */
+    'M'.repeat(5000),                                   /* muito longo */
+    '',                                                 /* vazio */
+    '<script>alert(1)</script>',                        /* HTML */
+    '=HYPERLINK("http://mau","x")',                     /* fórmula */
+    '+351 Clínica',                                     /* começa por + */
+    'Clínica "das" Aspas',                              /* aspas */
+    "Clínica 'simples'",
+    '../../etc/passwd',
+    '${process.env.SECRET}'
+  ];
+  for (const nome of perigosos) {
+    /* não rebenta, e o que sai da normalização não tem markup nenhum */
+    const norm = normalizarNome(nome);
+    assert.equal(/[<>"'`${}=]/.test(norm), false, 'normalizarNome deixou passar: ' + norm.slice(0, 40));
+    for (const t of tokensDistintivos(nome)) {
+      assert.match(t, /^[a-z0-9]+$/, 'token com caracteres não esperados: ' + t);
+    }
+    const r = avaliarIdentidade({ nomeLead: nome, nif: NIPC, rotuloNif: 'NIPC',
+                                  firmaOficial: 'MEDIBRACARA - CENTRO MÉDICO LDA' });
+    assert.ok(IDENTIDADES_VALIDAS.includes(r.estado), JSON.stringify(nome).slice(0, 40));
+  }
+});
+
+test('um nome enorme não inflaciona o que fica guardado', () => {
+  /* o corte é da API; aqui garante-se que nada a jusante o multiplica */
+  const nome = 'Clínica '.repeat(500);
+  const r = avaliarIdentidade({ nomeLead: nome.slice(0, 200), nif: NIPC, rotuloNif: 'NIPC',
+                                firmaOficial: 'MEDIBRACARA - CENTRO MÉDICO LDA' });
+  assert.ok(JSON.stringify(r).length < 4000, 'envelope de ' + JSON.stringify(r).length + ' bytes');
+});

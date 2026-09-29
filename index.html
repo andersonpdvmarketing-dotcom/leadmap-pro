@@ -6302,8 +6302,14 @@ async function investigarLeadEmpresa(lead, geracao) {
     const res = await fetchWithTimeout('/api/enrich/company', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      /* O nome vai porque a validação de identidade compara o nome
+         comercial com a firma do registo. Sem ele, os sinais de nome
+         nunca disparam e uma empresa legítima cujo domínio não diga
+         nada fica por confirmar sem razão. `N/D` é ausência, não nome —
+         mesma guarda que o website já tinha. */
       body: JSON.stringify({ lead: {
         id: lead.id,
+        nome: lead.nome && lead.nome !== ND ? lead.nome : null,
         website: lead.website && lead.website !== ND ? lead.website : null,
         nif: e.nif && e.nif.valor ? String(e.nif.valor) : null
       } })
