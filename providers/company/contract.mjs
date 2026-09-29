@@ -444,7 +444,12 @@ export function respostaConsulta({
 /** Uma afirmação de uma fonte sobre um campo. */
 export function evidencia({
   valor, fonte, url = null, consultadoEm = null, confianca = null,
-  estado = ESTADO_DADO.CONFIRMADO, tipoFonte = TIPO_FONTE.OUTRO
+  estado = ESTADO_DADO.CONFIRMADO, tipoFonte = TIPO_FONTE.OUTRO,
+  /* A que ano o número diz respeito, quando a frase o disser, e a frase
+     em si. Opcionais: uma evidência da Fase 1 não os tem e continua
+     válida. "Em 2018 tínhamos 40 colaboradores" não é uma afirmação
+     sobre hoje, e sem o ano ninguém o saberia ao olhar para o 40. */
+  anoReferencia = null, textoOriginal = null
 } = {}) {
   if (!TIPOS_FONTE_VALIDOS.includes(tipoFonte)) {
     throw new CompanyProviderError('INVALID_DATA',
@@ -457,7 +462,16 @@ export function evidencia({
   /* reutiliza a validação do envelope: uma evidência é um envelope com
      origem declarada, e não pode ser mais permissiva do que ele */
   const base = envelope({ valor, fonte, consultadoEm, confianca, estado });
-  return { ...base, url: url ? String(url) : null, tipoFonte };
+  const ev = { ...base, url: url ? String(url) : null, tipoFonte };
+  const ano = Number(anoReferencia);
+  if (Number.isInteger(ano) && ano >= 1900 && ano <= new Date().getFullYear() + 1) {
+    ev.anoReferencia = ano;
+  }
+  if (typeof textoOriginal === 'string' && textoOriginal.trim()) {
+    /* §16: um excerto para auditar, nunca a página */
+    ev.textoOriginal = textoOriginal.trim().slice(0, 300);
+  }
+  return ev;
 }
 
 /** Quanto pesa uma evidência quando as fontes discordam. */

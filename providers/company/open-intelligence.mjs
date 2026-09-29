@@ -103,6 +103,8 @@ export function evidenciasDoWebsite(achados, quando) {
         fonte: 'Website oficial',
         url: a.url || null,
         consultadoEm: quando,
+        anoReferencia: a.anoReferencia || null,
+        textoOriginal: a.textoOriginal || null,
         /* o próprio a declarar sobre si: alta, mas não máxima — não há
            terceiro a verificar */
         confianca: minimo ? 0.6 : 0.75,

@@ -244,21 +244,40 @@ test('website: teto de tentativas, não só de leituras', async () => {
   assert.ok(fn.pedidos() <= MAX_TENTATIVAS, 'bateu mais vezes do que o teto');
 });
 
-test('website: para assim que tem NIF e capital', async () => {
+test('website: para quando tem tudo o que procura', async () => {
+  /* A regra antiga parava com NIF e capital, e por isso nunca chegava às
+     páginas onde estão os funcionários e a faturação. Agora só para com
+     os quatro — ou quando o orçamento acaba, o que vier primeiro. */
   const fn = siteSimulado({
-    'https://x.pt/': '<p>NIPC: ' + NIPC + '</p>',
-    'https://x.pt/contactos': '<p>Capital Social: €50.000</p>',
+    'https://x.pt/': '<a href="/sobre">Sobre nós</a><p>NIPC: ' + NIPC +
+      ' · Capital Social: €50.000 · Temos 30 colaboradores · ' +
+      'volume de negócios de 2 milhões de euros em 2025</p>',
     'https://x.pt/sobre': '<p>nunca deve chegar aqui</p>'
   });
   const r = await investigarWebsite('https://x.pt', { fetchPagina: fn });
-  assert.equal(fn.pedidos(), 2, 'continuou a pedir depois de ter o que precisava');
+  assert.equal(fn.pedidos(), 1, 'tinha tudo na homepage e continuou a pedir');
+  assert.equal(r.paginasLidas, 1);
 });
 
-test('website: as páginas de alto rendimento vêm dentro do teto', () => {
-  /* /termos e /legal são onde o capital social aparece por obrigação
-     legal em Portugal; fora do teto de tentativas nunca seriam lidas */
-  for (const c of ['/', '/contactos', '/sobre', '/termos', '/legal']) {
-    assert.ok(CAMINHOS.indexOf(c) < MAX_TENTATIVAS, c + ' está fora do alcance');
+test('website: não para cedo demais quando ainda falta um campo', async () => {
+  /* Com NIF e capital mas sem funcionários, a versão anterior desistia
+     aqui — e os funcionários estavam na página seguinte. */
+  const fn = siteSimulado({
+    'https://x.pt/': '<a href="/empresa">A empresa</a><p>NIPC: ' + NIPC +
+      ' · Capital Social: €50.000</p>',
+    'https://x.pt/empresa': '<p>Nº total de trabalhadores: 21</p>'
+  });
+  const r = await investigarWebsite('https://x.pt', { fetchPagina: fn });
+  assert.ok(r.achados.some(a => a.campo === 'funcionarios' && a.valor === 21),
+    'parou antes de chegar aos funcionários');
+});
+
+test('website: a lista de recurso é curta e de alto rendimento', () => {
+  /* Já não são catorze caminhos às cegas: são seis, e só entram quando a
+     homepage não deu links nenhuns. */
+  assert.ok(CAMINHOS.length <= 6, 'a lista de recurso voltou a crescer');
+  for (const c of ['/sobre', '/empresa', '/contactos', '/termos']) {
+    assert.ok(CAMINHOS.includes(c), c + ' saiu da lista de recurso');
   }
 });
 
